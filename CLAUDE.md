@@ -1,6 +1,10 @@
+@AGENTS.md
+
 ## Environment
 
-- User's editor is **LazyVim** (Neovim). When suggesting how to create/edit a file by hand, give Neovim-style instructions (e.g. `nvim <file>`, `i` to insert, `Esc` then `:wq` to save).
+- Editor is **LazyVim** (Neovim). Give Neovim-style instructions for manual file edits (`nvim <file>`, `i` to insert, `Esc` then `:wq` to save).
+
+Private working notes (collaboration preferences, project status, decisions) live in `docs/PROJECT-NOTES.md` — read that file too, it's intentionally gitignored and won't be here for outside readers.
 
 ## Agent skills
 
