@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum SongType {
+  COMPLETA
+  POPURRI
+}
+
+enum Intensity {
+  TRANQUILA
+  MEDIA
+  BAILABLE
+  ENERGICA
+}
+
+enum EventStatus {
+  PENDIENTE
+  CONFIRMADO
+  CANCELADO
+}
+
+// ==========================================
+// USUARIOS Y PROYECTOS (multi-tenant)
+// ==========================================
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  createdAt     DateTime @default(now())
+
+  memberships   Membership[]
+  ownedProjects Project[]        @relation("ProjectOwner")
+  payouts       EventPayout[]
+  auditLogs     AuditLog[]
+}
+
+model Project {
+  id                  String   @id @default(uuid())
+  name                String
+  slug                String   @unique
+  isPublic            Boolean  @default(false)
+
+  ownerId             String
+  owner               User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  // Tokens de Google (encriptados a nivel de aplicación antes de guardarlos)
+  googleRefreshToken  String?
+
+  createdAt           DateTime @default(now())
+
+  memberships         Membership[]
+  songs               Song[]
+  setlists            Setlist[]
+  events              Event[]
+  auditLogs           AuditLog[]
+}
+
+model Membership {
+  id         String   @id @default(uuid())
+  role       Role     @default(VIEWER)
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+// ==========================================
+// REPERTORIO
+// ==========================================
+
+model Song {
+  id            String     @id @default(uuid())
+
+  projectId     String
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title         String
+  key           String?    // tonalidad, ej: "Am", "G"
+  durationSec   Int
+  intensity     Intensity
+  language      String
+  type          SongType   @default(COMPLETA)
+
+  // Si type = POPURRI, este campo no se usa acá.
+  // Las canciones que componen el popurrí se guardan como filas propias
+  // con parentSongId apuntando a este registro.
+  parentSongId  String?
+  parentSong    Song?      @relation("PopurriSongs", fields: [parentSongId], references: [id], onDelete: Cascade)
+  popurriSongs  Song[]     @relation("PopurriSongs")
+
+  createdAt     DateTime   @default(now())
+
+  setlistSongs      SetlistSong[]
+  eventSetlistSongs EventSetlistSong[]
+}
+
+// ==========================================
+// SETLISTS (plantillas reutilizables)
+// ==========================================
+
+model Setlist {
+  id         String   @id @default(uuid())
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name       String
+  category   String   // libre: "cumbia", "rock", "latinos" — sin enum, editable
+
+  createdAt  DateTime @default(now())
+
+  songs      SetlistSong[]
+  events     Event[]        // eventos que usaron este setlist como fuente
+}
+
+model SetlistSong {
+  id         String   @id @default(uuid())
+
+  setlistId  String
+  setlist    Setlist  @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+
+  songId     String
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  order      Int
+
+  @@unique([setlistId, songId])
+}
+
+// ==========================================
+// EVENTOS
+// ==========================================
+
+model Event {
+  id                String       @id @default(uuid())
+
+  projectId         String
+  project           Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name              String
+  date              DateTime
+  location          String
+  durationMin       Int
+  payment           Decimal      @db.Decimal(10, 2)
+  status             EventStatus @default(PENDIENTE)
+
+  // Referencia informativa al setlist original usado como base
+  sourceSetlistId   String?
+  sourceSetlist     Setlist?     @relation(fields: [sourceSetlistId], references: [id])
+
+  // Integración Google Calendar
+  googleEventId     String?
+
+  createdAt         DateTime     @default(now())
+
+  // Snapshot editable del setlist, independiente de la plantilla
+  songs             EventSetlistSong[]
+  payouts           EventPayout[]
+  equipmentItems    EquipmentItem[]
+}
+
+// Copia editable de canciones para un evento puntual.
+// Editar esto NUNCA modifica el Setlist original.
+model EventSetlistSong {
+  id        String   @id @default(uuid())
+
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  songId    String
+  song      Song     @relation(fields: [songId], references: [id])
+
+  order     Int
+
+  @@unique([eventId, songId])
+}
+
+// Reparto de ganancias — privado por integrante.
+// La visibilidad se filtra siempre en el backend, nunca solo en el frontend:
+// ADMIN ve todos los payouts del evento, el resto solo ve el propio.
+model EventPayout {
+  id         String   @id @default(uuid())
+
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  amount     Decimal  @db.Decimal(10, 2)
+  percentage Decimal? @db.Decimal(5, 2)
+
+  @@unique([eventId, userId])
+}
+
+// Checklist de equipo por evento (PA, monitoreo, etc). Campo libre,
+// no booleans fijos, para no requerir migraciones cada vez que cambie.
+model EquipmentItem {
+  id        String   @id @default(uuid())
+
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  label     String
+  checked   Boolean  @default(false)
+}
+
+// ==========================================
+// AUDITORÍA
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  action    String   // ej: "setlist.edited", "event.confirmed", "member.invited"
+  entityId  String
+  metadata  Json?    // detalle de qué cambió (útil para debugging y UI de actividad)
+
+  createdAt DateTime @default(now())
+}

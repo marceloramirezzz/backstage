@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+build/
+
+# enviroment / secrets
+.env
+.env.local
+.env.*.local
+
+# logs and caches
+*.log
+.turbo/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# AI agent local-only files
+docs/GIT-NOTES.md
+.claude/
