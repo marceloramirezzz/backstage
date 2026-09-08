@@ -7,7 +7,8 @@ privado, checklist de equipo, modo público y auditoría.
 ## Stack
 
 - **Next.js 15 (App Router)** + TypeScript
-- **PostgreSQL** + **Prisma**
+- **PostgreSQL** — raw SQL via `pg` (node-postgres), no ORM. Hand-written
+  migrations in `migrations/`, run with `npm run db:migrate`.
 - **TailwindCSS**
 - **TanStack Query** (con optimistic updates)
 - Auth: **Clerk** o **Auth0** (invitaciones de integrantes)
@@ -21,8 +22,9 @@ privado, checklist de equipo, modo público y auditoría.
 
 ```
 band-manager/
-├── prisma/
-│   └── schema.prisma          # Modelo de datos completo (ver más abajo)
+├── migrations/
+│   ├── 0001_init.sql           # Schema completo, SQL a mano (ver más abajo)
+│   └── run.ts                  # Runner minimalista (npm run db:migrate)
 │
 ├── src/
 │   ├── app/
@@ -52,7 +54,7 @@ band-manager/
 │   │   └── dashboard/                  # Gráficos, cards de métricas (Recharts)
 │   │
 │   ├── lib/
-│   │   ├── prisma.ts                   # Cliente de Prisma (singleton)
+│   │   ├── db.ts                       # Pool de pg (singleton)
 │   │   ├── auth.ts                     # Helpers de sesión
 │   │   ├── permissions.ts              # Chequeo de rol (ADMIN / EDITOR / VIEWER) por proyecto
 │   │   ├── google-calendar.ts          # Crear / eliminar eventos en Calendar
@@ -74,7 +76,7 @@ band-manager/
 
 | Feature                                              | Dónde                                                                             |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Roles y permisos                                     | `Membership` (schema) + `lib/permissions.ts`                                      |
+| Roles y permisos                                     | tabla `memberships` (`migrations/0001_init.sql`) + `lib/permissions.ts`           |
 | Invitaciones                                         | `server/actions/invite-member.ts` + Resend                                        |
 | Repertorio con popurrí                               | `Song.parentSongId` (auto-relación)                                               |
 | Setlists editables por evento sin tocar la plantilla | `EventSetlistSong` (copia independiente de `SetlistSong`)                         |
@@ -90,8 +92,7 @@ band-manager/
 
 ## Próximos pasos sugeridos
 
-1. `npx create-next-app@latest` con TypeScript + Tailwind + App Router
-2. Copiar `prisma/schema.prisma` de este scaffold
-3. `npx prisma migrate dev --name init`
-4. Configurar Auth (Clerk es lo más rápido para arrancar)
-5. Implementar `lib/permissions.ts` antes que nada — todo lo demás depende de esto
+1. ~~`npx create-next-app@latest` con TypeScript + Tailwind + App Router~~ hecho
+2. `docker compose up -d` + `npm run db:migrate` (schema listo en `migrations/0001_init.sql`, falta correrlo)
+3. Configurar Auth (Clerk es lo más rápido para arrancar)
+4. Implementar `lib/permissions.ts` antes que nada — todo lo demás depende de esto
