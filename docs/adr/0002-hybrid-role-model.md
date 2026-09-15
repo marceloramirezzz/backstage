@@ -1,0 +1,9 @@
+# Roles are a fixed built-in pair plus admin-defined custom roles with a limited permission set
+
+Every Project has two fixed roles — **Admin** (full permissions, can't be edited or deleted) and **Member** (baseline: read access everywhere, no admin actions) — that always exist. On top of these, a Project can define any number of **custom roles** (e.g. "Roadie"), each configured with a small, fixed set of togglable permissions: edit repertoire/setlists/events, invite/remove members, see total pay & expenses per event. One permission is deliberately excluded from that toggle set and hardcoded instead: seeing other Members' individual payout splits — Admin always can, no other role (built-in or custom) ever can, regardless of custom-role configuration.
+
+**Alternatives considered**:
+- **Fully fixed roles** (Admin/Member/Roadie, hardcoded, nothing configurable) — simpler, but the first band that needs a role we didn't anticipate (sound engineer, manager) would be stuck.
+- **Fully general permissions system** (admin toggles an open-ended list of granular permissions per custom role) — maximally flexible, but a lot of UI/complexity for a simple band tool, and risks accidentally exposing sensitive data (like other members' splits) through a permission nobody meant to grant.
+
+Landed on the hybrid because it gives real extensibility (any band can name a role it actually needs) while keeping the permission surface small and safe by construction — the one genuinely sensitive permission (others' splits) isn't just defaulted off, it's structurally impossible to grant to anyone but Admin. This is hard to reverse once bands have created custom roles around the current toggle set, and a future reader adding a new permission toggle might not realize "other members' splits" was deliberately left out rather than forgotten — hence recording it here.
