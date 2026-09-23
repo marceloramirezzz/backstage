@@ -39,6 +39,8 @@ async function passwordMatches(password: string, stored: string): Promise<boolea
 
 const DUMMY_HASH = await hashPassword(randomBytes(16).toString("hex"));
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 const newToken = () => randomBytes(32).toString("base64url");
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
@@ -61,7 +63,7 @@ export async function signUp(
        )
        SELECT * FROM created`,
       [
-        input.email.trim().toLowerCase(),
+        normalizeEmail(input.email),
         displayName,
         await hashPassword(input.password),
         hashToken(verificationToken),
@@ -84,7 +86,7 @@ export async function logIn(
 ): Promise<{ user: User; sessionToken: string }> {
   const { rows } = await pool.query<User & { passwordHash: string | null }>(
     `SELECT ${USER_COLUMNS}, password_hash AS "passwordHash" FROM users WHERE email = $1`,
-    [input.email.trim().toLowerCase()],
+    [normalizeEmail(input.email)],
   );
   // Hash even when there's no password to check, so timing doesn't reveal
   // which emails have accounts.
@@ -102,15 +104,19 @@ export async function logIn(
 }
 
 // Follows an email verification link. Each link works once.
-export async function verifyEmail(pool: Pool, token: string): Promise<User> {
+export async function verifyEmail(
+  pool: Pool,
+  token: string,
+  now: Date = new Date(),
+): Promise<User> {
   const { rows } = await pool.query<User>(
     `WITH used AS (
        DELETE FROM email_verification_tokens WHERE token_hash = $1 RETURNING user_id
      )
-     UPDATE users SET email_verified_at = coalesce(email_verified_at, now())
+     UPDATE users SET email_verified_at = coalesce(email_verified_at, $2)
      WHERE id = (SELECT user_id FROM used)
      RETURNING ${USER_COLUMNS}`,
-    [hashToken(token)],
+    [hashToken(token), now],
   );
   if (!rows[0]) throw new ServiceError("invalid_token", "This verification link is not valid");
   return rows[0];
