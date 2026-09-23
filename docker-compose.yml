@@ -10,5 +10,28 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "backstage"]
+      interval: 2s
+      retries: 15
+  migrate:
+    build: .
+    profiles: [app]
+    command: ["node", "scripts/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://backstage:backstage@db:5432/backstage
+    depends_on:
+      db:
+        condition: service_healthy
+  app:
+    build: .
+    profiles: [app]
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://backstage:backstage@db:5432/backstage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 volumes:
   pgdata:
