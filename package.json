@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +14,7 @@
     "migrate": "node --env-file=.env scripts/migrate.ts",
     "db:reset": "node --env-file=.env scripts/reset-db.ts",
     "test": "node --env-file-if-exists=.env --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "next": "16.3.5",
