@@ -1,25 +1,12 @@
-import { Client } from "pg";
-import { migrate } from "../src/db/migrate.ts";
+import { createMigratedDatabase, dropDatabase } from "../src/db/admin.ts";
 
 // Drops and recreates the local dev database, then applies all migrations.
 const url = new URL(process.env.DATABASE_URL!);
-const dbName = url.pathname.slice(1);
-
-const admin = new Client({
-  connectionString: Object.assign(new URL(url), { pathname: "/postgres" }).href,
-});
-await admin.connect();
-try {
-  await admin.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
-  await admin.query(`CREATE DATABASE "${dbName}"`);
-} finally {
-  await admin.end();
+if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname)) {
+  console.error(`Refusing to reset non-local database at ${url.hostname}.`);
+  process.exit(1);
 }
+const name = url.pathname.slice(1);
 
-const client = new Client({ connectionString: url.href });
-await client.connect();
-try {
-  await migrate(client);
-} finally {
-  await client.end();
-}
+await dropDatabase(url.href, name);
+await createMigratedDatabase(url.href, name);

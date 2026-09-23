@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { migrate } from "../src/db/migrate.ts";
+import { createMigratedDatabase, dropDatabase, urlForDatabase } from "../src/db/admin.ts";
 
 export interface TestDb {
   pool: pg.Pool;
@@ -10,37 +10,18 @@ export interface TestDb {
 // Creates a throwaway database on the same server as DATABASE_URL, with all
 // migrations applied. One per call, so test files never share state.
 export async function createTestDb(): Promise<TestDb> {
-  const base = new URL(process.env.DATABASE_URL!);
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) throw new Error("DATABASE_URL is not set (see .env)");
   const name = `backstage_test_${randomUUID().replaceAll("-", "")}`;
-  const urlFor = (db: string) => Object.assign(new URL(base), { pathname: `/${db}` }).href;
 
-  const admin = new pg.Client({ connectionString: urlFor("postgres") });
-  await admin.connect();
-  await admin.query(`CREATE DATABASE "${name}"`);
+  await createMigratedDatabase(baseUrl, name, () => {});
 
-  const client = new pg.Client({ connectionString: urlFor(name) });
-  await client.connect();
-  const log = console.log;
-  console.log = () => {};
-  try {
-    await migrate(client);
-  } catch (err) {
-    await client.end();
-    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-    await admin.end();
-    throw err;
-  } finally {
-    console.log = log;
-  }
-  await client.end();
-
-  const pool = new pg.Pool({ connectionString: urlFor(name) });
+  const pool = new pg.Pool({ connectionString: urlForDatabase(baseUrl, name) });
   return {
     pool,
     async close() {
       await pool.end();
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
-      await admin.end();
+      await dropDatabase(baseUrl, name);
     },
   };
 }

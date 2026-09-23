@@ -10,7 +10,7 @@
     "lint": "eslint",
     "migrate": "node --env-file=.env scripts/migrate.ts",
     "db:reset": "node --env-file=.env scripts/reset-db.ts",
-    "test": "node --env-file=.env --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "test": "node --env-file-if-exists=.env --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

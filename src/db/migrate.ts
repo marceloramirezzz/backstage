@@ -4,7 +4,10 @@ import type { Client } from "pg";
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, "..", "..", "migrations");
 
-export async function migrate(client: Client): Promise<void> {
+export async function migrate(
+  client: Client,
+  log: (message: string) => void = console.log,
+): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename TEXT PRIMARY KEY,
@@ -23,14 +26,14 @@ export async function migrate(client: Client): Promise<void> {
     .filter((filename) => !applied.has(filename));
 
   if (pending.length === 0) {
-    console.log("No pending migrations.");
+    log("No pending migrations.");
     return;
   }
 
   for (const filename of pending) {
     const sql = readFileSync(path.join(MIGRATIONS_DIR, filename), "utf8");
 
-    console.log(`Applying ${filename}...`);
+    log(`Applying ${filename}...`);
     try {
       await client.query("BEGIN");
       await client.query(sql);
