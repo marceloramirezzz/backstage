@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { ServiceError } from "./errors.ts";
 
 export interface Project {
   id: string;
@@ -6,7 +7,7 @@ export interface Project {
 }
 
 // Creates a Project with its built-in Admin and Member roles; the creator
-// becomes its first Admin.
+// becomes its first Admin. The creator must have verified their email.
 export async function createProject(
   pool: Pool,
   input: { name: string; userId: string },
@@ -14,6 +15,13 @@ export async function createProject(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const { rows: creator } = await client.query<{ verified: boolean }>(
+      "SELECT email_verified_at IS NOT NULL AS verified FROM users WHERE id = $1",
+      [input.userId],
+    );
+    if (!creator[0]?.verified) {
+      throw new ServiceError("email_not_verified", "Verify your email before creating a Project");
+    }
     const { rows } = await client.query<Project>(
       "INSERT INTO projects (name) VALUES ($1) RETURNING id, name",
       [input.name],
