@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
+import { signUp, verifyEmail } from "./accounts.ts";
 import { createProject } from "./projects.ts";
 
 describe("createProject", () => {
@@ -11,10 +12,12 @@ describe("createProject", () => {
   after(() => db.close());
 
   it("makes the creator the first Admin of a new Project", async () => {
-    const { rows } = await db.pool.query(
-      "INSERT INTO users (email) VALUES ('a@example.com') RETURNING id",
-    );
-    const userId: string = rows[0].id;
+    const { verificationToken } = await signUp(db.pool, {
+      email: "a@example.com",
+      password: "a password",
+      displayName: "A",
+    });
+    const { id: userId } = await verifyEmail(db.pool, verificationToken);
 
     const project = await createProject(db.pool, { name: "Los Tigres", userId });
 
@@ -24,5 +27,18 @@ describe("createProject", () => {
       [project.id, userId],
     );
     assert.deepEqual(members, [{ kind: "admin" }]);
+  });
+
+  it("refuses a User who hasn't verified their email", async () => {
+    const { user } = await signUp(db.pool, {
+      email: "b@example.com",
+      password: "a password",
+      displayName: "B",
+    });
+
+    await assert.rejects(createProject(db.pool, { name: "Los Leones", userId: user.id }), {
+      name: "ServiceError",
+      code: "email_not_verified",
+    });
   });
 });
