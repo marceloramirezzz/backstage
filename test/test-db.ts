@@ -24,10 +24,15 @@ export async function createTestDb(): Promise<TestDb> {
   console.log = () => {};
   try {
     await migrate(client);
+  } catch (err) {
+    await client.end();
+    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+    await admin.end();
+    throw err;
   } finally {
     console.log = log;
-    await client.end();
   }
+  await client.end();
 
   const pool = new pg.Pool({ connectionString: urlFor(name) });
   return {
