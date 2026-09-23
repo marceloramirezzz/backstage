@@ -6,7 +6,7 @@ CREATE TABLE roles (
   kind       role_kind NOT NULL,
   name       TEXT NOT NULL,
   can_edit_repertoire_setlists_events BOOLEAN,
-  can_invite_remove_members           BOOLEAN,
+  can_remove_members                  BOOLEAN,
   can_see_total_pay_expenses          BOOLEAN,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -16,12 +16,12 @@ CREATE TABLE roles (
   CHECK (
     (kind = 'custom'
       AND can_edit_repertoire_setlists_events IS NOT NULL
-      AND can_invite_remove_members IS NOT NULL
+      AND can_remove_members IS NOT NULL
       AND can_see_total_pay_expenses IS NOT NULL)
     OR
     (kind <> 'custom'
       AND can_edit_repertoire_setlists_events IS NULL
-      AND can_invite_remove_members IS NULL
+      AND can_remove_members IS NULL
       AND can_see_total_pay_expenses IS NULL)
   )
 );
