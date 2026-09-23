@@ -95,12 +95,16 @@ export async function logIn(
   if (!passwordHash || !matches) {
     throw new ServiceError("invalid_credentials", "Invalid email or password");
   }
+  return { user, sessionToken: await startSession(pool, user.id, now) };
+}
+
+async function startSession(pool: Pool, userId: string, now: Date): Promise<string> {
   const sessionToken = newToken();
   await pool.query(
     "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
-    [hashToken(sessionToken), user.id, sessionExpiry(now)],
+    [hashToken(sessionToken), userId, sessionExpiry(now)],
   );
-  return { user, sessionToken };
+  return sessionToken;
 }
 
 // Follows an email verification link. Each link works once.
@@ -143,4 +147,107 @@ export async function getSessionUser(
 
 export async function logOut(pool: Pool, sessionToken: string): Promise<void> {
   await pool.query("DELETE FROM sessions WHERE token_hash = $1", [hashToken(sessionToken)]);
+}
+
+// What Google tells us about the person, taken from an ID token the caller has
+// already verified.
+export interface GoogleProfile {
+  googleId: string;
+  email: string;
+  emailVerified: boolean;
+  name: string;
+}
+
+const googleDisplayName = (profile: GoogleProfile) =>
+  profile.name.trim() || normalizeEmail(profile.email).split("@")[0];
+
+// Signs in with Google, creating the User on first sign-in. Google Users
+// count as verified.
+export async function signInWithGoogle(
+  pool: Pool,
+  profile: GoogleProfile,
+  now: Date = new Date(),
+): Promise<{ user: User; sessionToken: string }> {
+  // An unverified Google email proves nothing, so it can neither link to an
+  // existing User nor create a verified one.
+  if (!profile.emailVerified) {
+    throw new ServiceError("email_not_verified", "Google hasn't verified this email address");
+  }
+  const client = await pool.connect();
+  let user: User;
+  try {
+    await client.query("BEGIN");
+    const { rows: linked } = await client.query<User>(
+      `SELECT ${USER_COLUMNS} FROM users WHERE google_id = $1`,
+      [profile.googleId],
+    );
+    const { rows: sameEmail } = await client.query<{
+      id: string;
+      emailVerified: boolean;
+      hasGoogle: boolean;
+    }>(
+      `SELECT id, email_verified_at IS NOT NULL AS "emailVerified",
+         google_id IS NOT NULL AS "hasGoogle"
+       FROM users WHERE email = $1 FOR UPDATE`,
+      [normalizeEmail(profile.email)],
+    );
+    if (linked[0]) {
+      user = linked[0];
+    } else if (sameEmail[0]?.hasGoogle) {
+      throw new ServiceError("email_taken", "This email belongs to a different Google account");
+    } else if (sameEmail[0]?.emailVerified) {
+      const { rows } = await client.query<User>(
+        `UPDATE users SET google_id = $2 WHERE id = $1 RETURNING ${USER_COLUMNS}`,
+        [sameEmail[0].id, profile.googleId],
+      );
+      user = rows[0];
+    } else if (sameEmail[0]) {
+      // Nobody proved they own this address until now, so whoever set the
+      // password may not be this person: drop their password, sessions and
+      // pending verification, and take the Google name.
+      const { id } = sameEmail[0];
+      await client.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+      await client.query("DELETE FROM email_verification_tokens WHERE user_id = $1", [id]);
+      const { rows } = await client.query<User>(
+        `UPDATE users
+         SET google_id = $2, email_verified_at = $3, password_hash = NULL, display_name = $4
+         WHERE id = $1
+         RETURNING ${USER_COLUMNS}`,
+        [id, profile.googleId, now, googleDisplayName(profile)],
+      );
+      user = rows[0];
+    } else {
+      const { rows } = await client.query<User>(
+        `INSERT INTO users (email, display_name, google_id, email_verified_at)
+         VALUES ($1, $2, $3, $4)
+         RETURNING ${USER_COLUMNS}`,
+        [normalizeEmail(profile.email), googleDisplayName(profile), profile.googleId, now],
+      );
+      user = rows[0];
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    // A sign-up for the same email committed between our lookup and insert.
+    if ((err as { constraint?: string }).constraint === "users_email_key") {
+      throw new ServiceError("email_taken", "An account with this email already exists");
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+  return { user, sessionToken: await startSession(pool, user.id, now) };
+}
+
+// Gives a User without a password (e.g. Google-only) one, so they can also
+// log in by email and password.
+export async function addPassword(
+  pool: Pool,
+  input: { userId: string; password: string },
+): Promise<void> {
+  const { rowCount } = await pool.query(
+    "UPDATE users SET password_hash = $2 WHERE id = $1 AND password_hash IS NULL",
+    [input.userId, await hashPassword(input.password)],
+  );
+  if (!rowCount) throw new ServiceError("password_already_set", "This account already has a password");
 }

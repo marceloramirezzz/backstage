@@ -3,7 +3,8 @@ export type ServiceErrorCode =
   | "email_taken"
   | "invalid_input"
   | "invalid_token"
-  | "email_not_verified";
+  | "email_not_verified"
+  | "password_already_set";
 
 // An expected, user-facing failure of a service call. Callers switch on `code`.
 export class ServiceError extends Error {
