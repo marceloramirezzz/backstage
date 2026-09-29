@@ -101,10 +101,10 @@ describe("createProject atomicity", () => {
 
     await assert.rejects(createProject(db.pool, user, { name: "Los Lobos" }), /boom/);
 
-    const { rows } = await db.pool.query(
-      "SELECT (SELECT count(*) FROM projects)::int AS projects, (SELECT count(*) FROM roles)::int AS roles",
-    );
-    assert.deepEqual(rows, [{ projects: 0, roles: 0 }]);
+    assert.deepEqual(await listProjects(db.pool, user), []);
+    // No service reads Roles yet (#9), so check for orphaned ones directly.
+    const { rows } = await db.pool.query("SELECT count(*)::int AS roles FROM roles");
+    assert.deepEqual(rows, [{ roles: 0 }]);
   });
 });
 
