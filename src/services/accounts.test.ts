@@ -202,7 +202,7 @@ describe("accounts", () => {
         code: "invalid_credentials",
       });
 
-      await addPassword(db.pool, { userId: user.id, password: "new password" });
+      await addPassword(db.pool, user, { password: "new password" });
 
       const byPassword = await logIn(db.pool, { email: "mia@example.com", password: "new password" });
       assert.equal(byPassword.user.id, user.id);
@@ -213,7 +213,7 @@ describe("accounts", () => {
     it("won't replace a password the User already has", async () => {
       const { user } = await signUp(db.pool, { email: "noa@example.com", password: "old password", displayName: "Noa" });
 
-      await assert.rejects(addPassword(db.pool, { userId: user.id, password: "new password" }), {
+      await assert.rejects(addPassword(db.pool, user, { password: "new password" }), {
         name: "ServiceError",
         code: "password_already_set",
       });
