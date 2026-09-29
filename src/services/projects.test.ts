@@ -17,14 +17,14 @@ describe("createProject", () => {
       password: "a password",
       displayName: "A",
     });
-    const { id: userId } = await verifyEmail(db.pool, verificationToken);
+    const user = await verifyEmail(db.pool, verificationToken);
 
-    const project = await createProject(db.pool, { name: "Los Tigres", userId });
+    const project = await createProject(db.pool, user, { name: "Los Tigres" });
 
     const { rows: members } = await db.pool.query(
       `SELECT r.kind FROM memberships m JOIN roles r ON r.id = m.role_id
        WHERE m.project_id = $1 AND m.user_id = $2`,
-      [project.id, userId],
+      [project.id, user.id],
     );
     assert.deepEqual(members, [{ kind: "admin" }]);
   });
@@ -36,7 +36,7 @@ describe("createProject", () => {
       displayName: "B",
     });
 
-    await assert.rejects(createProject(db.pool, { name: "Los Leones", userId: user.id }), {
+    await assert.rejects(createProject(db.pool, user, { name: "Los Leones" }), {
       name: "ServiceError",
       code: "email_not_verified",
     });

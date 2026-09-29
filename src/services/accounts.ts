@@ -243,11 +243,12 @@ export async function signInWithGoogle(
 // log in by email and password.
 export async function addPassword(
   pool: Pool,
-  input: { userId: string; password: string },
+  user: User,
+  input: { password: string },
 ): Promise<void> {
   const { rowCount } = await pool.query(
     "UPDATE users SET password_hash = $2 WHERE id = $1 AND password_hash IS NULL",
-    [input.userId, await hashPassword(input.password)],
+    [user.id, await hashPassword(input.password)],
   );
   if (!rowCount) throw new ServiceError("password_already_set", "This account already has a password");
 }
