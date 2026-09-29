@@ -11,6 +11,8 @@ CREATE TABLE roles (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (project_id, name),
+  -- Lets memberships require a Role from their own Project.
+  UNIQUE (project_id, id),
   -- Permission flags only mean something for custom roles: NULL for
   -- admin/member, all three set for custom.
   CHECK (

@@ -1,17 +1,9 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
-import { signUp, verifyEmail, type User } from "./accounts.ts";
+import { verifiedUser } from "../../test/users.ts";
+import { signUp } from "./accounts.ts";
 import { createProject, getProject, listProjects } from "./projects.ts";
-
-async function verifiedUser(db: TestDb, email: string): Promise<User> {
-  const { verificationToken } = await signUp(db.pool, {
-    email,
-    password: "a password",
-    displayName: email,
-  });
-  return verifyEmail(db.pool, verificationToken);
-}
 
 describe("createProject", () => {
   let db: TestDb;
@@ -102,7 +94,7 @@ describe("createProject atomicity", () => {
     await assert.rejects(createProject(db.pool, user, { name: "Los Lobos" }), /boom/);
 
     assert.deepEqual(await listProjects(db.pool, user), []);
-    // No service reads Roles yet (#9), so check for orphaned ones directly.
+    // Roles are only readable through a Membership, so check for orphans directly.
     const { rows } = await db.pool.query("SELECT count(*)::int AS roles FROM roles");
     assert.deepEqual(rows, [{ roles: 0 }]);
   });
