@@ -1,3 +1,5 @@
+import { withReturnPath } from "./return-path.ts";
+
 // The web session cookie, shared by the proxy (which can't reach the
 // database) and the server code that resolves it.
 export const SESSION_COOKIE = "session";
@@ -19,5 +21,5 @@ export const RETURN_PATH_HEADER = "x-return-path";
 
 // Where signed-out visitors go, carrying the page to return to.
 export function signInPath(returnPath?: string | null): string {
-  return returnPath ? `/ingresar?volver=${encodeURIComponent(returnPath)}` : "/ingresar";
+  return withReturnPath("/ingresar", returnPath);
 }

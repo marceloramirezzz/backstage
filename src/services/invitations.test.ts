@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { memoryMailer } from "../../test/mailer.ts";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import {
@@ -37,7 +38,7 @@ async function join(db: TestDb, owner: User, projectId: string, role: Role, emai
 
 // A Project with just its Owner.
 async function band(db: TestDb, name: string) {
-  const owner = await verifiedUser(db, `${name}-owner@example.com`);
+  const owner = await verifiedUser(db, `${name.replaceAll(" ", "-")}-owner@example.com`);
   const project = await createProject(db.pool, owner, { name });
   const memberRole = await builtIn(db, owner, project.id, "member");
   const adminRole = await builtIn(db, owner, project.id, "admin");
@@ -232,7 +233,7 @@ describe("acceptInvitation", () => {
     const [{ invitation }] = await sendInvitations(db.pool, owner, project.id, [
       { email: "bassist@example.com", roleId: memberRole.id },
     ]);
-    const { user: bassist } = await signUp(db.pool, {
+    const { user: bassist } = await signUp(db.pool, memoryMailer(), {
       email: "bassist@example.com",
       password: "a password",
       displayName: "Bassist",
@@ -511,7 +512,7 @@ describe("listMyInvitations", () => {
     await sendInvitations(db.pool, owner, project.id, [
       { email: "pending@example.com", roleId: memberRole.id },
     ]);
-    const { user } = await signUp(db.pool, {
+    const { user } = await signUp(db.pool, memoryMailer(), {
       email: "pending@example.com",
       password: "a password",
       displayName: "Pending",

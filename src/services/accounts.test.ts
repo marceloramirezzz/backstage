@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { linkToken, memoryMailer, sentTo } from "../../test/mailer.ts";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import {
   addPassword,
   getSessionUser,
   logIn,
   logOut,
+  requestVerificationEmail,
   signInWithGoogle,
   signUp,
   verifyEmail,
@@ -16,13 +18,14 @@ const days = (n: number) => n * 24 * 60 * 60 * 1000;
 
 describe("accounts", () => {
   let db: TestDb;
+  const mailer = memoryMailer();
   before(async () => {
     db = await createTestDb();
   });
   after(() => db.close());
 
   it("lets a new User log in with the email and password they signed up with", async () => {
-    await signUp(db.pool, {
+    await signUp(db.pool, mailer, {
       email: "Ana@Example.com",
       password: "correct horse",
       displayName: "Ana",
@@ -36,7 +39,7 @@ describe("accounts", () => {
   });
 
   it("rejects a wrong password or an unknown email alike", async () => {
-    await signUp(db.pool, { email: "bea@example.com", password: "right password", displayName: "Bea" });
+    await signUp(db.pool, mailer, { email: "bea@example.com", password: "right password", displayName: "Bea" });
 
     const invalid = { name: "ServiceError", code: "invalid_credentials" };
     await assert.rejects(logIn(db.pool, { email: "bea@example.com", password: "wrong password" }), invalid);
@@ -44,19 +47,28 @@ describe("accounts", () => {
   });
 
   it("allows only one User per email, ignoring case", async () => {
-    await signUp(db.pool, { email: "cam@example.com", password: "first password", displayName: "Cam" });
+    await signUp(db.pool, mailer, { email: "cam@example.com", password: "first password", displayName: "Cam" });
 
     await assert.rejects(
-      signUp(db.pool, { email: "CAM@example.com", password: "second password", displayName: "Other Cam" }),
+      signUp(db.pool, mailer, { email: "CAM@example.com", password: "second password", displayName: "Other Cam" }),
       { name: "ServiceError", code: "email_taken" },
     );
     const { user } = await logIn(db.pool, { email: "cam@example.com", password: "first password" });
     assert.equal(user.displayName, "Cam");
   });
 
+  it("requires a real-looking email and a password of at least 8 characters to sign up", async () => {
+    const invalid = { name: "ServiceError", code: "invalid_input" };
+    await assert.rejects(signUp(db.pool, mailer, { email: "not-an-email", password: "a password", displayName: "Rio" }), invalid);
+    await assert.rejects(signUp(db.pool, mailer, { email: "rio@example.com", password: "1234567", displayName: "Rio" }), invalid);
+    assert.equal(sentTo(mailer, "rio@example.com").length, 0);
+
+    await signUp(db.pool, mailer, { email: " rio@example.com ", password: "12345678", displayName: "Rio" });
+  });
+
   it("requires a display name to sign up", async () => {
     await assert.rejects(
-      signUp(db.pool, { email: "dan@example.com", password: "a password", displayName: "   " }),
+      signUp(db.pool, mailer, { email: "dan@example.com", password: "a password", displayName: "   " }),
       { name: "ServiceError", code: "invalid_input" },
     );
     await assert.rejects(logIn(db.pool, { email: "dan@example.com", password: "a password" }), {
@@ -64,24 +76,72 @@ describe("accounts", () => {
     });
   });
 
-  it("marks the email verified when the verification link is followed, once", async () => {
-    const { verificationToken } = await signUp(db.pool, {
-      email: "eva@example.com",
-      password: "a password",
-      displayName: "Eva",
+  describe("email verification", () => {
+    const verificationToken = (email: string) => linkToken(sentTo(mailer, email).at(-1)!, "/verificar");
+
+    it("emails a verification link in Spanish to the new User's address", async () => {
+      await signUp(db.pool, mailer, { email: "Eli@Example.com", password: "a password", displayName: "Eli" });
+
+      const [email, ...others] = sentTo(mailer, "eli@example.com");
+      assert.equal(others.length, 0);
+      assert.equal(email.subject, "Verificá tu correo en Backstage");
+      assert.match(email.body, /^Hola, Eli:/);
+      assert.ok(verificationToken("eli@example.com"));
     });
 
-    const verified = await verifyEmail(db.pool, verificationToken);
+    it("verifies the User and signs them in when the link is followed, once", async () => {
+      await signUp(db.pool, mailer, { email: "eva@example.com", password: "a password", displayName: "Eva" });
+      const token = verificationToken("eva@example.com");
 
-    assert.equal(verified.emailVerified, true);
-    const { user } = await logIn(db.pool, { email: "eva@example.com", password: "a password" });
-    assert.equal(user.emailVerified, true);
-    await assert.rejects(verifyEmail(db.pool, verificationToken), { code: "invalid_token" });
-    await assert.rejects(verifyEmail(db.pool, "not-a-real-token"), { code: "invalid_token" });
+      const { user, sessionToken } = await verifyEmail(db.pool, token);
+
+      assert.equal(user.emailVerified, true);
+      assert.equal((await getSessionUser(db.pool, sessionToken))?.id, user.id);
+      const loggedIn = await logIn(db.pool, { email: "eva@example.com", password: "a password" });
+      assert.equal(loggedIn.user.emailVerified, true);
+      await assert.rejects(verifyEmail(db.pool, token), { code: "invalid_token" });
+      await assert.rejects(verifyEmail(db.pool, "not-a-real-token"), { code: "invalid_token" });
+    });
+
+    it("rejects a link after 24 hours", async () => {
+      const signedUpAt = new Date("2026-01-01T12:00:00Z");
+      const at = (hours: number) => new Date(signedUpAt.getTime() + hours * 60 * 60 * 1000);
+      await signUp(db.pool, mailer, { email: "ivy@example.com", password: "a password", displayName: "Ivy" }, signedUpAt);
+      await signUp(db.pool, mailer, { email: "jon@example.com", password: "a password", displayName: "Jon" }, signedUpAt);
+
+      await verifyEmail(db.pool, verificationToken("ivy@example.com"), at(23.9));
+      await assert.rejects(verifyEmail(db.pool, verificationToken("jon@example.com"), at(24)), {
+        code: "invalid_token",
+      });
+    });
+
+    it("sends a fresh link on request, and only the newest one works", async () => {
+      await signUp(db.pool, mailer, { email: "kim@example.com", password: "a password", displayName: "Kim" });
+      const first = verificationToken("kim@example.com");
+
+      await requestVerificationEmail(db.pool, mailer, "KIM@example.com");
+
+      assert.equal(sentTo(mailer, "kim@example.com").length, 2);
+      const newest = verificationToken("kim@example.com");
+      await assert.rejects(verifyEmail(db.pool, first), { code: "invalid_token" });
+      const { user } = await verifyEmail(db.pool, newest);
+      assert.equal(user.emailVerified, true);
+    });
+
+    it("sends nothing on request for a verified User or an unknown email, alike", async () => {
+      await signUp(db.pool, mailer, { email: "lu@example.com", password: "a password", displayName: "Lu" });
+      await verifyEmail(db.pool, verificationToken("lu@example.com"));
+      const sentBefore = mailer.sent.length;
+
+      await requestVerificationEmail(db.pool, mailer, "lu@example.com");
+      await requestVerificationEmail(db.pool, mailer, "nobody-here@example.com");
+
+      assert.equal(mailer.sent.length, sentBefore);
+    });
   });
 
   it("keeps a User logged in until they log out", async () => {
-    await signUp(db.pool, { email: "fer@example.com", password: "a password", displayName: "Fer" });
+    await signUp(db.pool, mailer, { email: "fer@example.com", password: "a password", displayName: "Fer" });
     const { sessionToken } = await logIn(db.pool, { email: "fer@example.com", password: "a password" });
 
     assert.equal((await getSessionUser(db.pool, sessionToken))?.email, "fer@example.com");
@@ -93,7 +153,7 @@ describe("accounts", () => {
   });
 
   it("ends a session after 30 days without use, counted from the last use", async () => {
-    await signUp(db.pool, { email: "gus@example.com", password: "a password", displayName: "Gus" });
+    await signUp(db.pool, mailer, { email: "gus@example.com", password: "a password", displayName: "Gus" });
     const loginAt = new Date("2026-01-01T12:00:00Z");
     const at = (n: number) => new Date(loginAt.getTime() + days(n));
     const { sessionToken } = await logIn(
@@ -141,12 +201,12 @@ describe("accounts", () => {
     });
 
     it("links to the existing User with the same email instead of creating another", async () => {
-      const { user: existing, verificationToken } = await signUp(db.pool, {
+      const { user: existing } = await signUp(db.pool, mailer, {
         email: "joa@example.com",
         password: "a password",
         displayName: "Joa",
       });
-      await verifyEmail(db.pool, verificationToken);
+      await verifyEmail(db.pool, linkToken(sentTo(mailer, "joa@example.com")[0], "/verificar"));
 
       const { user } = await signInWithGoogle(db.pool, googleProfile("JOA@example.com", { name: "Joa From Google" }));
 
@@ -158,7 +218,7 @@ describe("accounts", () => {
 
     it("shuts out whoever set the password when linking to an unverified User", async () => {
       // Someone signs up with an address they don't own and never verifies it.
-      await signUp(db.pool, { email: "ona@example.com", password: "squatter password", displayName: "Squatter" });
+      await signUp(db.pool, mailer, { email: "ona@example.com", password: "squatter password", displayName: "Squatter" });
       const squatter = await logIn(db.pool, { email: "ona@example.com", password: "squatter password" });
 
       const owner = await signInWithGoogle(db.pool, googleProfile("ona@example.com"));
@@ -183,7 +243,7 @@ describe("accounts", () => {
     });
 
     it("never links or signs in when Google hasn't verified the email", async () => {
-      await signUp(db.pool, { email: "kai@example.com", password: "a password", displayName: "Kai" });
+      await signUp(db.pool, mailer, { email: "kai@example.com", password: "a password", displayName: "Kai" });
       const unverified = { name: "ServiceError", code: "email_not_verified" };
 
       await assert.rejects(signInWithGoogle(db.pool, googleProfile("kai@example.com", { emailVerified: false })), unverified);
@@ -192,7 +252,7 @@ describe("accounts", () => {
       // Kai wasn't linked (linking would verify them) and no User was created for Lia.
       const { user } = await logIn(db.pool, { email: "kai@example.com", password: "a password" });
       assert.equal(user.emailVerified, false);
-      await signUp(db.pool, { email: "lia@example.com", password: "a password", displayName: "Lia" });
+      await signUp(db.pool, mailer, { email: "lia@example.com", password: "a password", displayName: "Lia" });
     });
 
     it("lets a Google-only User add a password and then log in either way", async () => {
@@ -211,7 +271,7 @@ describe("accounts", () => {
     });
 
     it("won't replace a password the User already has", async () => {
-      const { user } = await signUp(db.pool, { email: "noa@example.com", password: "old password", displayName: "Noa" });
+      const { user } = await signUp(db.pool, mailer, { email: "noa@example.com", password: "old password", displayName: "Noa" });
 
       await assert.rejects(addPassword(db.pool, user, { password: "new password" }), {
         name: "ServiceError",

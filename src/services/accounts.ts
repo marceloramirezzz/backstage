@@ -1,6 +1,7 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import type { Pool } from "pg";
+import type { EmailMessage, Mailer } from "../email/mailer.ts";
 import { ServiceError } from "./errors.ts";
 import { hashToken, newToken } from "./tokens.ts";
 
@@ -20,6 +21,9 @@ const scryptAsync = promisify(scrypt) as (
 const UNIQUE_VIOLATION = "23505";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const sessionExpiry = (now: Date) => new Date(now.getTime() + SESSION_TTL_MS);
+const VERIFICATION_TTL_HOURS = 24;
+const VERIFICATION_TTL_MS = VERIFICATION_TTL_HOURS * 60 * 60 * 1000;
+const verificationExpiry = (now: Date) => new Date(now.getTime() + VERIFICATION_TTL_MS);
 
 const USER_COLUMNS = `id, email, display_name AS "displayName",
   email_verified_at IS NOT NULL AS "emailVerified"`;
@@ -42,13 +46,24 @@ const DUMMY_HASH = await hashPassword(randomBytes(16).toString("hex"));
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-// Creates a password User. Returns the token for their email verification link.
+export const MIN_PASSWORD_LENGTH = 8;
+// Only catches typos like a missing "@"; the verification email is the real check.
+const looksLikeEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+// Creates a password User, signs them in and emails them a verification link.
 export async function signUp(
   pool: Pool,
+  mailer: Mailer,
   input: { email: string; password: string; displayName: string },
-): Promise<{ user: User; verificationToken: string }> {
+  now: Date = new Date(),
+): Promise<{ user: User; sessionToken: string }> {
   const displayName = input.displayName.trim();
   if (!displayName) throw new ServiceError("invalid_input", "Display name is required");
+  const email = normalizeEmail(input.email);
+  if (!looksLikeEmail(email)) throw new ServiceError("invalid_input", "Email is not valid");
+  if (input.password.length < MIN_PASSWORD_LENGTH) {
+    throw new ServiceError("invalid_input", `Password must have at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
   const verificationToken = newToken();
   const { rows } = await pool
     .query<User>(
@@ -56,15 +71,16 @@ export async function signUp(
          INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3)
          RETURNING ${USER_COLUMNS}
        ), token AS (
-         INSERT INTO email_verification_tokens (token_hash, user_id)
-         SELECT $4, id FROM created
+         INSERT INTO email_verification_tokens (token_hash, user_id, expires_at)
+         SELECT $4, id, $5 FROM created
        )
        SELECT * FROM created`,
       [
-        normalizeEmail(input.email),
+        email,
         displayName,
         await hashPassword(input.password),
         hashToken(verificationToken),
+        verificationExpiry(now),
       ],
     )
     .catch((err) => {
@@ -73,7 +89,58 @@ export async function signUp(
       }
       throw err;
     });
-  return { user: rows[0], verificationToken };
+  const user = rows[0];
+  const sessionToken = await startSession(pool, user.id, now);
+  // The account exists either way; if this email is lost, the User can ask
+  // for another from the app.
+  await mailer.send(verificationEmail(mailer, user, verificationToken)).catch((err) => {
+    console.error("Couldn't send the verification email after sign-up", err);
+  });
+  return { user, sessionToken };
+}
+
+// Emails a fresh verification link to the User with this email, if they
+// haven't verified it yet; earlier links stop working. Quietly does nothing
+// otherwise, so the caller can't tell whether the email has an account.
+export async function requestVerificationEmail(
+  pool: Pool,
+  mailer: Mailer,
+  email: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const verificationToken = newToken();
+  const { rows } = await pool.query<User>(
+    `WITH target AS (
+       SELECT ${USER_COLUMNS} FROM users WHERE email = $1 AND email_verified_at IS NULL
+     ), token AS (
+       INSERT INTO email_verification_tokens (token_hash, user_id, expires_at)
+       SELECT $2, id, $3 FROM target
+       ON CONFLICT (user_id) DO UPDATE
+       SET token_hash = excluded.token_hash, expires_at = excluded.expires_at,
+         created_at = now()
+     )
+     SELECT * FROM target`,
+    [normalizeEmail(email), hashToken(verificationToken), verificationExpiry(now)],
+  );
+  if (rows[0]) await mailer.send(verificationEmail(mailer, rows[0], verificationToken));
+}
+
+function verificationEmail(mailer: Mailer, user: User, token: string): EmailMessage {
+  const link = new URL(`/verificar?token=${token}`, mailer.appUrl);
+  return {
+    to: user.email,
+    subject: "Verificá tu correo en Backstage",
+    body: `Hola, ${user.displayName}:
+
+Para confirmar que este correo es tuyo, abrí este enlace:
+
+${link}
+
+El enlace vence en ${VERIFICATION_TTL_HOURS} horas. Sin verificarlo no vas a poder crear una banda ni aceptar invitaciones.
+
+Si no creaste una cuenta en Backstage, ignorá este correo.
+`,
+  };
 }
 
 // Starts a 30-day session. Unverified Users may log in.
@@ -105,23 +172,26 @@ async function startSession(pool: Pool, userId: string, now: Date): Promise<stri
   return sessionToken;
 }
 
-// Follows an email verification link. Each link works once.
+// Follows an email verification link, which also signs the User in, as
+// only they could have opened it. Each link works once, within 24 hours.
 export async function verifyEmail(
   pool: Pool,
   token: string,
   now: Date = new Date(),
-): Promise<User> {
+): Promise<{ user: User; sessionToken: string }> {
   const { rows } = await pool.query<User>(
     `WITH used AS (
-       DELETE FROM email_verification_tokens WHERE token_hash = $1 RETURNING user_id
+       DELETE FROM email_verification_tokens WHERE token_hash = $1
+       RETURNING user_id, expires_at
      )
      UPDATE users SET email_verified_at = coalesce(email_verified_at, $2)
-     WHERE id = (SELECT user_id FROM used)
+     WHERE id = (SELECT user_id FROM used WHERE expires_at > $2)
      RETURNING ${USER_COLUMNS}`,
     [hashToken(token), now],
   );
-  if (!rows[0]) throw new ServiceError("invalid_token", "This verification link is not valid");
-  return rows[0];
+  const user = rows[0];
+  if (!user) throw new ServiceError("invalid_token", "This verification link is not valid");
+  return { user, sessionToken: await startSession(pool, user.id, now) };
 }
 
 // Resolves a session token to its User, or null if it's unknown or expired.
