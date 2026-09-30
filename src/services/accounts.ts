@@ -1,7 +1,8 @@
-import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import type { Pool } from "pg";
 import { ServiceError } from "./errors.ts";
+import { hashToken, newToken } from "./tokens.ts";
 
 export interface User {
   id: string;
@@ -39,10 +40,7 @@ async function passwordMatches(password: string, stored: string): Promise<boolea
 
 const DUMMY_HASH = await hashPassword(randomBytes(16).toString("hex"));
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
-const newToken = () => randomBytes(32).toString("base64url");
-const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 // Creates a password User. Returns the token for their email verification link.
 export async function signUp(

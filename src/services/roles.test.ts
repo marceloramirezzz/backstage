@@ -3,6 +3,7 @@ import { after, before, describe, it } from "node:test";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import type { User } from "./accounts.ts";
+import { acceptInvitation, revokeInvitation, sendInvitations } from "./invitations.ts";
 import { getPermissions, type Permissions } from "./permissions.ts";
 import { createProject, type Project } from "./projects.ts";
 import {
@@ -28,28 +29,36 @@ const ALL_TOGGLES: RoleToggles = {
   seeTotalPayExpenses: true,
 };
 
-// No service adds Members until Invitations (#10), so join directly.
-async function addMember(db: TestDb, project: Project, user: User, role: Role): Promise<void> {
-  await db.pool.query(
-    "INSERT INTO memberships (project_id, user_id, role_id) VALUES ($1, $2, $3)",
-    [project.id, user.id, role.id],
-  );
+// Invites the User with the Role and accepts, so they join the Project.
+async function addMember(
+  db: TestDb,
+  owner: User,
+  project: Project,
+  user: User,
+  role: Role,
+): Promise<void> {
+  const [{ invitation }] = await sendInvitations(db.pool, owner, project.id, [
+    { email: user.email, roleId: role.id },
+  ]);
+  await acceptInvitation(db.pool, user, invitation.id);
 }
 
-// No service sends Invitations until #10 either, so insert one directly.
 async function invite(
   db: TestDb,
   project: Project,
-  invitedBy: User,
+  owner: User,
   role: Role,
   email: string,
+  sentAt?: Date,
 ): Promise<string> {
-  const { rows } = await db.pool.query<{ id: string }>(
-    `INSERT INTO invitations (project_id, role_id, email, token, invited_by, expires_at)
-     VALUES ($1, $2, $3, gen_random_uuid(), $4, now() + interval '7 days') RETURNING id`,
-    [project.id, role.id, email, invitedBy.id],
+  const [{ invitation }] = await sendInvitations(
+    db.pool,
+    owner,
+    project.id,
+    [{ email, roleId: role.id }],
+    sentAt,
   );
-  return rows[0].id;
+  return invitation.id;
 }
 
 async function builtIn(db: TestDb, owner: User, project: Project, kind: Role["kind"]) {
@@ -63,7 +72,7 @@ async function band(db: TestDb, name: string) {
   const owner = await verifiedUser(db, `${name}-owner@example.com`);
   const member = await verifiedUser(db, `${name}-member@example.com`);
   const project = await createProject(db.pool, owner, { name });
-  await addMember(db, project, member, await builtIn(db, owner, project, "member"));
+  await addMember(db, owner, project, member, await builtIn(db, owner, project, "member"));
   return { owner, member, project };
 }
 
@@ -106,7 +115,7 @@ describe("getPermissions", () => {
         name: "Roadie",
         toggles: { ...NO_TOGGLES, [toggle]: true },
       });
-      await addMember(db, project, roadie, role);
+      await addMember(db, owner, project, roadie, role);
 
       assert.deepEqual(await getPermissions(db.pool, roadie, project.id), {
         ...NO_TOGGLES,
@@ -124,7 +133,7 @@ describe("getPermissions", () => {
       name: "Manager",
       toggles: ALL_TOGGLES,
     });
-    await addMember(db, project, roadie, role);
+    await addMember(db, owner, project, roadie, role);
 
     assert.deepEqual(await getPermissions(db.pool, roadie, project.id), {
       ...ALL_TOGGLES,
@@ -139,7 +148,7 @@ describe("getPermissions", () => {
     // Smuggle in extra flags, as an untyped caller could, on create and on update.
     const smuggled = { ...ALL_TOGGLES, seeOthersPayoutSplits: true, administer: true } as RoleToggles;
     const role = await createRole(db.pool, owner, project.id, { name: "Manager", toggles: smuggled });
-    await addMember(db, project, roadie, role);
+    await addMember(db, owner, project, roadie, role);
     await updateRole(db.pool, owner, project.id, role.id, { name: "Manager", toggles: smuggled });
 
     const permissions = await getPermissions(db.pool, roadie, project.id);
@@ -313,17 +322,25 @@ describe("custom Role CRUD", () => {
 
     await assert.rejects(deleteRole(db.pool, owner, project.id, role.id), { code: "role_in_use" });
 
-    await db.pool.query("UPDATE invitations SET revoked_at = now() WHERE id = $1", [invitationId]);
+    await revokeInvitation(db.pool, owner, project.id, invitationId);
     await deleteRole(db.pool, owner, project.id, role.id);
   });
 
   it("lets accepted and expired Invitations go without blocking a Role's deletion", async () => {
     const { owner, project } = await band(db, "past-invites");
     const role = await createRole(db.pool, owner, project.id, { name: "Roadie", toggles: NO_TOGGLES });
-    const accepted = await invite(db, project, owner, role, "past-accepted@example.com");
-    const expired = await invite(db, project, owner, role, "past-expired@example.com");
-    await db.pool.query("UPDATE invitations SET accepted_at = now() WHERE id = $1", [accepted]);
-    await db.pool.query("UPDATE invitations SET expires_at = now() WHERE id = $1", [expired]);
+    const accepted = await verifiedUser(db, "past-accepted@example.com");
+    await addMember(db, owner, project, accepted, role);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    await invite(db, project, owner, role, "past-expired@example.com", weekAgo);
+    // The accepted Member still holds the Role, so move them off it first.
+    await changeMemberRole(
+      db.pool,
+      owner,
+      project.id,
+      accepted.id,
+      (await builtIn(db, owner, project, "member")).id,
+    );
 
     await deleteRole(db.pool, owner, project.id, role.id);
 
@@ -337,7 +354,7 @@ describe("custom Role CRUD", () => {
     const { owner, member, project } = await band(db, "forbidden");
     const crew = await verifiedUser(db, "forbidden-crew@example.com");
     const role = await createRole(db.pool, owner, project.id, { name: "Crew", toggles: ALL_TOGGLES });
-    await addMember(db, project, crew, role);
+    await addMember(db, owner, project, crew, role);
 
     for (const actor of [member, crew]) {
       await assert.rejects(
@@ -427,7 +444,7 @@ describe("changeMemberRole", () => {
     const other = await verifiedUser(db, "demote-other@example.com");
     const admin = await builtIn(db, owner, project, "admin");
     await changeMemberRole(db.pool, owner, project.id, member.id, admin.id);
-    await addMember(db, project, other, admin);
+    await addMember(db, owner, project, other, admin);
 
     await changeMemberRole(
       db.pool,
@@ -445,6 +462,7 @@ describe("changeMemberRole", () => {
     const crew = await verifiedUser(db, "change-forbidden-crew@example.com");
     await addMember(
       db,
+      owner,
       project,
       crew,
       await createRole(db.pool, owner, project.id, { name: "Crew", toggles: ALL_TOGGLES }),
