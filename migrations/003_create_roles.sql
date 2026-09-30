@@ -10,7 +10,8 @@ CREATE TABLE roles (
   can_see_total_pay_expenses          BOOLEAN,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (project_id, name),
+  -- Lets memberships require a Role from their own Project.
+  UNIQUE (project_id, id),
   -- Permission flags only mean something for custom roles: NULL for
   -- admin/member, all three set for custom.
   CHECK (
@@ -25,3 +26,7 @@ CREATE TABLE roles (
       AND can_see_total_pay_expenses IS NULL)
   )
 );
+
+-- Role names are unique per Project ignoring case, so no custom Role can pass
+-- for the built-in Admin or Member.
+CREATE UNIQUE INDEX roles_project_id_lower_name_key ON roles (project_id, lower(name));
