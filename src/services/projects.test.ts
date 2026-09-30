@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { memoryMailer } from "../../test/mailer.ts";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import { signUp } from "./accounts.ts";
@@ -43,7 +44,7 @@ describe("createProject", () => {
   });
 
   it("refuses a User who hasn't verified their email", async () => {
-    const { user } = await signUp(db.pool, {
+    const { user } = await signUp(db.pool, memoryMailer(), {
       email: "b@example.com",
       password: "a password",
       displayName: "B",

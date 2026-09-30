@@ -6,3 +6,8 @@ export function safeReturnPath(path: string | null | undefined): string | null {
   }
   return path;
 }
+
+// `path` carrying the page to return to afterwards, as the auth pages expect.
+export function withReturnPath(path: string, returnPath?: string | null): string {
+  return returnPath ? `${path}?volver=${encodeURIComponent(returnPath)}` : path;
+}

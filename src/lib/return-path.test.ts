@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { safeReturnPath } from "./return-path.ts";
+import { safeReturnPath, withReturnPath } from "./return-path.ts";
 
 describe("safeReturnPath", () => {
   it("keeps a local path with its query", () => {
@@ -20,5 +20,12 @@ describe("safeReturnPath", () => {
     ]) {
       assert.equal(safeReturnPath(unsafe), null, String(unsafe));
     }
+  });
+});
+
+describe("withReturnPath", () => {
+  it("carries the page to return to in `volver`, or nothing without one", () => {
+    assert.equal(withReturnPath("/crear-cuenta", "/p/1?mes=9"), "/crear-cuenta?volver=%2Fp%2F1%3Fmes%3D9");
+    assert.equal(withReturnPath("/crear-cuenta", null), "/crear-cuenta");
   });
 });

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signIn, type SignInState } from "@/app/session-actions.ts";
+import { authCardClass, FormMessage } from "@/components/auth-screen.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, Input } from "@/components/ui/field.tsx";
 
@@ -24,10 +25,7 @@ export function SignInForm({ returnPath }: { returnPath: string | null }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, { email: "" });
 
   return (
-    <form
-      action={action}
-      className="flex flex-col gap-4 rounded-lg border border-line bg-bg-1 p-6 max-desktop:p-5"
-    >
+    <form action={action} className={authCardClass}>
       {/* Google sign-in arrives with its own ticket. */}
       <Button size="lg" className="justify-center" disabled>
         <GoogleMark />
@@ -52,11 +50,7 @@ export function SignInForm({ returnPath }: { returnPath: string | null }) {
       <Field label="Contraseña">
         <Input size="lg" type="password" name="password" autoComplete="current-password" required />
       </Field>
-      {state.error && (
-        <p role="alert" className="m-0 text-[13px]/[18px] text-status-cancelled">
-          {state.error}
-        </p>
-      )}
+      {state.error && <FormMessage tone="error">{state.error}</FormMessage>}
       <Button type="submit" variant="primary" size="lg" className="justify-center" disabled={pending}>
         {pending ? "Ingresando…" : "Ingresar"}
       </Button>
