@@ -9,7 +9,8 @@ export interface Project {
   ownerId: string;
 }
 
-const PROJECT_COLUMNS = `p.id, p.name, p.owner_id AS "ownerId"`;
+// Expects the projects table aliased as `p`.
+export const PROJECT_COLUMNS = `p.id, p.name, p.owner_id AS "ownerId"`;
 
 // The Projects the acting User ($1) is a Member of.
 const MEMBER_PROJECTS = `SELECT ${PROJECT_COLUMNS} FROM projects p

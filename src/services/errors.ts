@@ -10,7 +10,10 @@ export type ServiceErrorCode =
   | "name_taken"
   | "built_in_role"
   | "role_in_use"
-  | "owner_protected";
+  | "owner_protected"
+  | "invitation_expired"
+  | "already_member"
+  | "already_invited";
 
 // An expected, user-facing failure of a service call. Callers switch on `code`.
 export class ServiceError extends Error {
@@ -21,4 +24,13 @@ export class ServiceError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+export const UNIQUE_VIOLATION = "23505";
+export const FOREIGN_KEY_VIOLATION = "23503";
+
+// Whether a Postgres error is `code` on the named constraint.
+export function isViolation(err: unknown, code: string, constraint: string): boolean {
+  const pgErr = err as { code?: string; constraint?: string };
+  return pgErr.code === code && pgErr.constraint === constraint;
 }

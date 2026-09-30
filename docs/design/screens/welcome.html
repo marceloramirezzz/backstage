@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+<link rel="stylesheet" href="../design-system/tokens.css">
+<link rel="stylesheet" href="../design-system/components.css">
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#0c0c0e}
+a{color:var(--spotlight-ink)}a:hover{color:var(--ink)}
+a.bs-chip,a.bs-btn,.bs-nav a{text-decoration:none}
+.app-side{display:block}
+@media (max-width: 900px){.app{grid-template-columns:minmax(0,1fr) !important}.app-side{display:none}.cols{grid-template-columns:minmax(0,1fr) !important}}
+
+</style>
+<div class="bs-root" data-theme="dark" style="min-height: 100vh; background: var(--bg-0); color: var(--ink); font-family: var(--font-sans)">
+<header class="bs-top"><span class="bs-brand" style="padding: 0"><img src="../design-system/logos/backstage-door-white.png" alt="" style="height: 28px">Backstage</span><div class="bs-top-end"><span style="display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--bg-3); color: var(--ink); font-size: 12px; font-weight: 600; flex: none">DA</span></div></header>
+<div style="max-width: 880px; margin: 0 auto; padding: 48px 24px; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: var(--radius-md); background: var(--status-pending-bg); color: var(--ink); font-size: 14px; flex-wrap: wrap">
+<span style="color: var(--status-pending)"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><span style="flex-grow: 1">Check your inbox to verify <b>diego@losdelvalle.com.py</b>. You need it to create a project or accept an invitation.</span><button class="bs-btn bs-btn-secondary bs-btn-sm">Resend email</button></div>
+<div><h1 style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em">Welcome, Diego</h1><p style="margin: 8px 0 0; font-size: 15px; color: var(--ink-muted)">Start a project for your band, or join one you’ve been invited to.</p></div>
+<div class="cols" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start">
+<section style="display: flex; flex-direction: column; gap: 16px; padding: 24px; border-radius: var(--radius-lg); background: var(--bg-2); border: 1px solid var(--spotlight)">
+<span style="display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--spotlight); color: var(--on-spotlight)"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px"><path d="M12 5v14M5 12h14"/></svg></span>
+<h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600">Create a project</h2>
+<p style="margin: 0; font-size: 14px; line-height: 20px; color: var(--ink-muted)">One project per band. You’ll be its Owner and first Admin.</p>
+<label class="bs-field"><span class="bs-label">Band name</span><input class="bs-input" placeholder="e.g. Los del Valle"></label>
+<a class="bs-btn bs-btn-primary" href="calendar.html" style="justify-content: center">Create project</a>
+</section>
+<section style="display: flex; flex-direction: column; gap: 16px; padding: 24px; border-radius: var(--radius-lg); background: var(--bg-2); border: 1px solid var(--line)">
+<span style="display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--bg-3); color: var(--ink)"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+<h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600">Invitations</h2>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: var(--radius-md); background: var(--bg-3)">
+<div style="display: flex; gap: 12px; align-items: center"><span style="display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--spotlight); color: var(--on-spotlight); font-size: 14px; font-weight: 600; flex: none">BK</span><span style="display: flex; flex-direction: column"><span style="font-weight: 500">Banda Kuarahy</span><span style="font-size: 12px; color: var(--ink-muted)">Join as Member · from Carlos Ferreira · expires in 6 days</span></span></div>
+<div style="display: flex; gap: 8px"><button class="bs-btn bs-btn-secondary bs-btn-sm" disabled="{yes}">Accept</button><button class="bs-btn bs-btn-ghost bs-btn-sm">Decline</button></div>
+<span style="font-size: 12px; color: var(--ink-muted)">Verify your email to accept.</span>
+</div>
+</section>
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import type { User } from "./accounts.ts";
-import { ServiceError } from "./errors.ts";
+import { FOREIGN_KEY_VIOLATION, isViolation, ServiceError, UNIQUE_VIOLATION } from "./errors.ts";
 import { isUuid } from "./ids.ts";
 import {
   getPermissions,
@@ -25,14 +25,6 @@ export interface Role {
 export interface RoleInput {
   name: string;
   toggles: RoleToggles;
-}
-
-const UNIQUE_VIOLATION = "23505";
-const FOREIGN_KEY_VIOLATION = "23503";
-
-function isViolation(err: unknown, code: string, constraint: string): boolean {
-  const pgErr = err as { code?: string; constraint?: string };
-  return pgErr.code === code && pgErr.constraint === constraint;
 }
 
 const ROLE_COLUMNS = `r.id, r.name, r.kind, ${ROLE_TOGGLES_SQL} AS toggles`;
