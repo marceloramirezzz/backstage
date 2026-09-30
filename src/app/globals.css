@@ -1,26 +1,172 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Design tokens from docs/design/design-system/tokens.css. Dark is the
+   default; light shares every name. */
+:root,
+[data-theme="dark"] {
+  --bg-0: #0c0c0e;
+  --bg-1: #131316;
+  --bg-2: #1b1b1f;
+  --bg-3: #26262b;
+  --line: #26262b;
+  --line-control: #6b6b75;
+  --ink: #f4f4f5;
+  --ink-muted: #a3a3ad;
+  --ink-subtle: #88888f;
+  --spotlight: #ffdd33;
+  --on-spotlight: #141414;
+  --spotlight-ink: #ffdd33;
+  --spotlight-soft: rgba(255, 221, 51, 0.1);
+  --focus-ring: #ffdd33;
+  --hot: #ff4d94;
+  --on-hot: #1a0510;
+  --status-pending: #f5a524;
+  --status-pending-bg: rgba(245, 165, 36, 0.1);
+  --status-confirmed: #3ecf6e;
+  --status-confirmed-bg: rgba(62, 207, 110, 0.1);
+  --status-paid: #5aa5ff;
+  --status-paid-bg: rgba(90, 165, 255, 0.1);
+  --status-cancelled: #ff6b6b;
+  --status-cancelled-bg: rgba(255, 107, 107, 0.1);
+  --shadow-pop: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-glow: 0 0 0 4px rgba(255, 221, 51, 0.14);
+  color-scheme: dark;
 }
 
+[data-theme="light"] {
+  --bg-0: #f6f6f3;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --bg-3: #ecece8;
+  --line: #e4e4e0;
+  --line-control: #85858e;
+  --ink: #17171a;
+  --ink-muted: #52525c;
+  --ink-subtle: #686872;
+  --spotlight: #ffd60a;
+  --on-spotlight: #141414;
+  --spotlight-ink: #7a5f00;
+  --spotlight-soft: rgba(255, 214, 10, 0.18);
+  --focus-ring: #7a5f00;
+  --hot: #c8175f;
+  --on-hot: #ffffff;
+  --status-pending: #9a5700;
+  --status-pending-bg: rgba(245, 165, 36, 0.12);
+  --status-confirmed: #16703a;
+  --status-confirmed-bg: rgba(62, 207, 110, 0.12);
+  --status-paid: #1c5cc0;
+  --status-paid-bg: rgba(90, 165, 255, 0.12);
+  --status-cancelled: #bf2a2a;
+  --status-cancelled-bg: rgba(255, 107, 107, 0.12);
+  --shadow-pop: 0 16px 40px rgba(20, 20, 20, 0.14), 0 0 0 1px rgba(20, 20, 20, 0.06);
+  --shadow-glow: 0 0 0 4px rgba(255, 214, 10, 0.28);
+  color-scheme: light;
+}
+
+/* Tokens as Tailwind utilities: bg-bg-1, text-ink-muted, rounded-pill,
+   text-body, font-mono… Spacing uses Tailwind's 4px scale, which
+   matches the token scale (p-1.5 = space-1-5). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-line: var(--line);
+  --color-line-control: var(--line-control);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-spotlight: var(--spotlight);
+  --color-on-spotlight: var(--on-spotlight);
+  --color-spotlight-ink: var(--spotlight-ink);
+  --color-spotlight-soft: var(--spotlight-soft);
+  --color-focus-ring: var(--focus-ring);
+  --color-hot: var(--hot);
+  --color-on-hot: var(--on-hot);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-confirmed-bg: var(--status-confirmed-bg);
+  --color-status-paid: var(--status-paid);
+  --color-status-paid-bg: var(--status-paid-bg);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-bg: var(--status-cancelled-bg);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Type styles from the brand book. */
+  --text-display: 32px;
+  --text-display--line-height: 36px;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+  --text-heading: 15px;
+  --text-heading--line-height: 20px;
+  --text-heading--font-weight: 600;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-small: 13px;
+  --text-small--line-height: 18px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+  --text-overline: 11px;
+  --text-overline--line-height: 14px;
+  --text-overline--font-weight: 500;
+  --text-overline--letter-spacing: 0.06em;
+  --text-stat: 28px;
+  --text-stat--line-height: 32px;
+  --text-stat--font-weight: 500;
+  --text-stat--letter-spacing: -0.02em;
+  --text-num: 13px;
+  --text-num--line-height: 18px;
+
+  /* The shell's sidebar becomes a drawer below this width. */
+  --breakpoint-desktop: 900px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Shadows are utilities rather than theme values, whose names would shadow
+   the per-theme tokens above. */
+@utility shadow-pop {
+  box-shadow: var(--shadow-pop);
+}
+
+@utility shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* In the base layer so component utilities override them. */
+@layer base {
+  body {
+    background: var(--bg-0);
+    color: var(--ink);
+    font-family: var(--font-sans);
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  a {
+    color: var(--spotlight-ink);
+  }
+
+  a:hover {
+    color: var(--ink);
+  }
+
+  /* Every control shows the brand focus ring. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
 }
