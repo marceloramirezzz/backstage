@@ -7,3 +7,9 @@ CREATE TABLE memberships (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (project_id, user_id)
 );
+
+-- The Owner is always a Member of their Project. Deferred, because the
+-- Project row has to exist before its Owner's Membership can.
+ALTER TABLE projects
+  ADD FOREIGN KEY (id, owner_id) REFERENCES memberships (project_id, user_id)
+  DEFERRABLE INITIALLY DEFERRED;
