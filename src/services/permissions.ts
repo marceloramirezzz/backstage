@@ -5,13 +5,18 @@ import { isUuid } from "./ids.ts";
 
 export type RoleKind = "admin" | "member" | "custom";
 
-// The permissions a custom Role can switch on. Seeing other Members' payout
-// splits is deliberately not among them (ADR 0002).
-export interface RoleToggles {
-  editRepertoireSetlistsEvents: boolean;
-  removeMembers: boolean;
-  seeTotalPayExpenses: boolean;
-}
+// The permissions a custom Role can switch on, each with its column on the
+// roles table. Seeing other Members' payout splits is deliberately not among
+// them (ADR 0002). A new toggle starts here.
+export const ROLE_TOGGLE_COLUMNS = {
+  editRepertoireSetlistsEvents: "can_edit_repertoire_setlists_events",
+  removeMembers: "can_remove_members",
+  seeTotalPayExpenses: "can_see_total_pay_expenses",
+} as const;
+
+export type RoleToggle = keyof typeof ROLE_TOGGLE_COLUMNS;
+export type RoleToggles = Record<RoleToggle, boolean>;
+export const ROLE_TOGGLES = Object.keys(ROLE_TOGGLE_COLUMNS) as RoleToggle[];
 
 // What a Member may do in a Project. Code checks these, never Role names.
 export interface Permissions extends RoleToggles {
@@ -44,9 +49,7 @@ function resolvePermissions(kind: RoleKind, toggles: RoleToggles | null): Permis
     case "custom":
       if (!toggles) throw new Error("A custom Role must have toggles");
       return {
-        editRepertoireSetlistsEvents: toggles.editRepertoireSetlistsEvents,
-        removeMembers: toggles.removeMembers,
-        seeTotalPayExpenses: toggles.seeTotalPayExpenses,
+        ...toggles,
         seeOthersPayoutSplits: false,
         administer: false,
       };
@@ -86,7 +89,6 @@ export async function requirePermission(
 
 // A Role row's toggles as a RoleToggles object, NULL for the built-in Roles.
 // Expects the roles table aliased as `r`.
-export const ROLE_TOGGLES_SQL = `CASE WHEN r.kind = 'custom' THEN json_build_object(
-  'editRepertoireSetlistsEvents', r.can_edit_repertoire_setlists_events,
-  'removeMembers', r.can_remove_members,
-  'seeTotalPayExpenses', r.can_see_total_pay_expenses) END`;
+export const ROLE_TOGGLES_SQL = `CASE WHEN r.kind = 'custom' THEN json_build_object(${ROLE_TOGGLES.map(
+  (t) => `'${t}', r.${ROLE_TOGGLE_COLUMNS[t]}`,
+).join(", ")}) END`;

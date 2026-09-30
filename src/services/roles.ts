@@ -5,6 +5,8 @@ import { isUuid } from "./ids.ts";
 import {
   getPermissions,
   requirePermission,
+  ROLE_TOGGLE_COLUMNS,
+  ROLE_TOGGLES,
   ROLE_TOGGLES_SQL,
   type RoleKind,
   type RoleToggles,
@@ -35,6 +37,16 @@ function isViolation(err: unknown, code: string, constraint: string): boolean {
 
 const ROLE_COLUMNS = `r.id, r.name, r.kind, ${ROLE_TOGGLES_SQL} AS toggles`;
 
+// The toggle columns, in ROLE_TOGGLES order, to line up with toggleValues().
+const TOGGLE_COLUMNS = ROLE_TOGGLES.map((t) => ROLE_TOGGLE_COLUMNS[t]);
+
+// "$n, $n+1, ..." placeholders for the toggle values, starting at $first.
+const togglePlaceholders = (first: number) => TOGGLE_COLUMNS.map((_, i) => `$${first + i}`);
+
+// "column = $n, ..." for an UPDATE, starting at $first.
+const toggleAssignments = (first: number) =>
+  TOGGLE_COLUMNS.map((column, i) => `${column} = $${first + i}`);
+
 // Every Role in the Project, built-in first. Any Member can see them.
 export async function listRoles(pool: Pool, user: User, projectId: string): Promise<Role[]> {
   await getPermissions(pool, user, projectId); // Members only
@@ -55,9 +67,8 @@ export async function createRole(
   const { name, toggles } = validRoleInput(input);
   try {
     const { rows } = await pool.query<Role>(
-      `INSERT INTO roles AS r (project_id, kind, name, can_edit_repertoire_setlists_events,
-         can_remove_members, can_see_total_pay_expenses)
-       VALUES ($1, 'custom', $2, $3, $4, $5) RETURNING ${ROLE_COLUMNS}`,
+      `INSERT INTO roles AS r (project_id, kind, name, ${TOGGLE_COLUMNS.join(", ")})
+       VALUES ($1, 'custom', $2, ${togglePlaceholders(3).join(", ")}) RETURNING ${ROLE_COLUMNS}`,
       [projectId, name, ...toggleValues(toggles)],
     );
     return rows[0];
@@ -80,10 +91,9 @@ export async function updateRole(
   await assertCustomRole(pool, projectId, roleId);
   try {
     const { rows } = await pool.query<Role>(
-      `UPDATE roles r SET name = $2, can_edit_repertoire_setlists_events = $3,
-         can_remove_members = $4, can_see_total_pay_expenses = $5, updated_at = now()
-       WHERE r.id = $1 AND r.project_id = $6 RETURNING ${ROLE_COLUMNS}`,
-      [roleId, name, ...toggleValues(toggles), projectId],
+      `UPDATE roles r SET name = $3, ${toggleAssignments(4).join(", ")}, updated_at = now()
+       WHERE r.id = $1 AND r.project_id = $2 RETURNING ${ROLE_COLUMNS}`,
+      [roleId, projectId, name, ...toggleValues(toggles)],
     );
     // Deleted since the check above.
     if (!rows[0]) throw new ServiceError("not_found", "Role not found");
@@ -173,19 +183,15 @@ function validRoleInput(input: RoleInput): RoleInput {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name) throw new ServiceError("invalid_input", "Role name is required");
   // Copy only the known toggles, so nothing else can be granted.
-  const { editRepertoireSetlistsEvents, removeMembers, seeTotalPayExpenses } = input.toggles ?? {};
-  const toggles = { editRepertoireSetlistsEvents, removeMembers, seeTotalPayExpenses };
+  const given: Partial<Record<string, unknown>> = input.toggles ?? {};
+  const toggles = Object.fromEntries(ROLE_TOGGLES.map((t) => [t, given[t]])) as RoleToggles;
   if (!Object.values(toggles).every((t) => typeof t === "boolean")) {
     throw new ServiceError("invalid_input", "Every permission must be on or off");
   }
   return { name, toggles };
 }
 
-const toggleValues = (t: RoleToggles) => [
-  t.editRepertoireSetlistsEvents,
-  t.removeMembers,
-  t.seeTotalPayExpenses,
-];
+const toggleValues = (t: RoleToggles) => ROLE_TOGGLES.map((toggle) => t[toggle]);
 
 function asNameTaken(err: unknown): unknown {
   if (isViolation(err, UNIQUE_VIOLATION, "roles_project_id_name_key")) {
