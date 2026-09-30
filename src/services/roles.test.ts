@@ -189,14 +189,14 @@ describe("custom Role CRUD", () => {
     assert.deepEqual(roles[2], role);
   });
 
-  it("refuses a blank or duplicate name", async () => {
+  it("refuses a blank or duplicate name, ignoring case", async () => {
     const { owner, project } = await band(db, "names");
     await createRole(db.pool, owner, project.id, { name: "Roadie", toggles: NO_TOGGLES });
 
     await assert.rejects(createRole(db.pool, owner, project.id, { name: " ", toggles: NO_TOGGLES }), {
       code: "invalid_input",
     });
-    for (const name of ["Roadie", "Admin"]) {
+    for (const name of ["Roadie", "ROADIE", "Admin", "admin", "mEmBeR"]) {
       await assert.rejects(createRole(db.pool, owner, project.id, { name, toggles: NO_TOGGLES }), {
         code: "name_taken",
       });
@@ -216,6 +216,24 @@ describe("custom Role CRUD", () => {
         code: "invalid_input",
       });
     }
+  });
+
+  it("refuses a rename onto another Role's name in any case, but allows recasing its own", async () => {
+    const { owner, project } = await band(db, "rename");
+    await createRole(db.pool, owner, project.id, { name: "Crew", toggles: NO_TOGGLES });
+    const role = await createRole(db.pool, owner, project.id, { name: "Roadie", toggles: NO_TOGGLES });
+
+    for (const name of ["crew", "ADMIN"]) {
+      await assert.rejects(
+        updateRole(db.pool, owner, project.id, role.id, { name, toggles: NO_TOGGLES }),
+        { code: "name_taken" },
+      );
+    }
+    const recased = await updateRole(db.pool, owner, project.id, role.id, {
+      name: "ROADIE",
+      toggles: NO_TOGGLES,
+    });
+    assert.equal(recased.name, "ROADIE");
   });
 
   it("allows the same name in different Projects", async () => {

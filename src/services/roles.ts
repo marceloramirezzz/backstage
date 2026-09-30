@@ -194,7 +194,7 @@ function validRoleInput(input: RoleInput): RoleInput {
 const toggleValues = (t: RoleToggles) => ROLE_TOGGLES.map((toggle) => t[toggle]);
 
 function asNameTaken(err: unknown): unknown {
-  if (isViolation(err, UNIQUE_VIOLATION, "roles_project_id_name_key")) {
+  if (isViolation(err, UNIQUE_VIOLATION, "roles_project_id_lower_name_key")) {
     return new ServiceError("name_taken", "A Role with that name already exists");
   }
   return err;
