@@ -117,6 +117,22 @@ describe("getPermissions", () => {
     });
   }
 
+  it("gives a custom Role with every toggle all three, but still no Admin permissions", async () => {
+    const { owner, project } = await band(db, "all-toggles");
+    const roadie = await verifiedUser(db, "all-toggles-roadie@example.com");
+    const role = await createRole(db.pool, owner, project.id, {
+      name: "Manager",
+      toggles: ALL_TOGGLES,
+    });
+    await addMember(db, project, roadie, role);
+
+    assert.deepEqual(await getPermissions(db.pool, roadie, project.id), {
+      ...ALL_TOGGLES,
+      seeOthersPayoutSplits: false,
+      administer: false,
+    } satisfies Permissions);
+  });
+
   it("never lets a custom Role see other Members' splits", async () => {
     const { owner, project } = await band(db, "splits");
     const roadie = await verifiedUser(db, "splits-roadie@example.com");

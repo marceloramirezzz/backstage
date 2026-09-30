@@ -154,11 +154,19 @@ export async function changeMemberRole(
   if (rows[0].isOwner) {
     throw new ServiceError("owner_protected", "The Owner's Role can't be changed");
   }
-  await pool.query(
-    `UPDATE memberships SET role_id = $3, updated_at = now()
-     WHERE project_id = $1 AND user_id = $2`,
-    [projectId, memberUserId, roleId],
-  );
+  try {
+    await pool.query(
+      `UPDATE memberships SET role_id = $3, updated_at = now()
+       WHERE project_id = $1 AND user_id = $2`,
+      [projectId, memberUserId, roleId],
+    );
+  } catch (err) {
+    // Deleted since the check above.
+    if (isViolation(err, FOREIGN_KEY_VIOLATION, "memberships_project_id_role_id_fkey")) {
+      throw new ServiceError("not_found", "Role not found");
+    }
+    throw err;
+  }
 }
 
 function validRoleInput(input: RoleInput): RoleInput {
