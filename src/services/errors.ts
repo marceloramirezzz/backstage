@@ -5,7 +5,12 @@ export type ServiceErrorCode =
   | "invalid_token"
   | "email_not_verified"
   | "password_already_set"
-  | "not_found";
+  | "not_found"
+  | "forbidden"
+  | "name_taken"
+  | "built_in_role"
+  | "role_in_use"
+  | "owner_protected";
 
 // An expected, user-facing failure of a service call. Callers switch on `code`.
 export class ServiceError extends Error {
