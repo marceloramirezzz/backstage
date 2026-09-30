@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Calendar</title>
+<link rel="stylesheet" href="../design-system/tokens.css">
+<link rel="stylesheet" href="../design-system/components.css">
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#0c0c0e}
+a{color:var(--spotlight-ink)}a:hover{color:var(--ink)}
+a.bs-chip,a.bs-btn,.bs-nav a{text-decoration:none}
+.app-side{display:block}
+@media (max-width: 900px){.app{grid-template-columns:minmax(0,1fr) !important}.app-side{display:none}.cols{grid-template-columns:minmax(0,1fr) !important}}
+
+</style>
+<div class="bs-root app" data-theme="dark" style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: var(--bg-0); color: var(--ink); font-family: var(--font-sans)">
+<div class="app-side" style="background: var(--bg-1)">
+<aside class="bs-side" data-theme="dark" style="width: 248px; height: 100%; box-sizing: border-box; font-family: var(--font-sans); color: var(--ink); position: sticky; top: 0">
+<a class="bs-brand" href="calendar.html"><img src="../design-system/logos/backstage-door-white.png" alt="" style="height: 28px">Backstage</a>
+<a class="bs-btn bs-btn-inverse" href="event.html" style="justify-content: center"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 5v14M5 12h14"/></svg>New event</a>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div class="bs-over">Band</div>
+<nav class="bs-nav">
+<a href="calendar.html" aria-current="page"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>Calendar</a>
+<a href="dashboard.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Dashboard</a>
+<a href="repertoire.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Repertoire</a>
+<a href="setlists.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Setlists</a>
+<a href="payouts.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Payouts</a>
+<a href="members.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Members<span class="bs-count">1</span></a>
+<a href="landing.html" ><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Landing page<span class="bs-tag">Off</span></a>
+</nav>
+</div>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px">
+<div class="bs-over">Settings</div>
+<nav class="bs-nav"><a href="members.html"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Project settings</a></nav>
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--line); margin-top: 8px">
+<span style="display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--bg-3); color: var(--ink); font-size: 12px; font-weight: 600; flex: none">DA</span>
+<div style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 14px; line-height: 20px; font-weight: 500">Diego Acosta</span><span style="font-size: 12px; line-height: 16px; color: var(--ink-muted)">Admin · Owner</span></div>
+</div>
+</div>
+</aside>
+
+</div>
+<div style="display: flex; flex-direction: column; min-width: 0">
+<header class="bs-top" style="flex-wrap: wrap">
+<button class="bs-iconbtn" aria-label="Collapse sidebar"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="m15 18-6-6 6-6"/></svg></button>
+<span class="bs-top-proj"><span class="bs-avatar">LV</span>Los del Valle</span>
+<div class="bs-seg" role="group"><button aria-pressed="false">Week</button><button aria-pressed="true">Month</button><button aria-pressed="false">Year</button><button aria-pressed="false">Today</button></div>
+<div class="bs-top-end">
+<button class="bs-iconbtn" aria-label="Search"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+<button class="bs-iconbtn" aria-label="Notifications"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button>
+<select class="bs-select bs-select-pill" aria-label="Month"><option>September</option></select>
+<select class="bs-select bs-select-pill" aria-label="Year"><option>2026</option></select>
+<a class="bs-btn bs-btn-primary" href="event.html"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 5v14M5 12h14"/></svg>New event</a>
+</div>
+</header>
+<main style="padding: 24px; display: flex; flex-direction: column; gap: 24px; min-width: 0">
+<div style="display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em">September 2026</h1>
+<p style="margin: 0; font-size: 14px; line-height: 20px; color: var(--ink-muted)">14 events · 6 confirmed or paid still to play this month</p>
+</div>
+<div style="margin-left: auto; display: flex; gap: 12px; align-items: center; flex-wrap: wrap"><div style="display: flex; gap: 8px; flex-wrap: wrap"><span class="bs-status bs-tone-pending"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pending</span><span class="bs-status bs-tone-confirmed"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><path d="M20 6 9 17l-5-5"/></svg>Confirmed</span><span class="bs-status bs-tone-paid"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>Paid</span><span class="bs-status bs-tone-cancelled"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><path d="M18 6 6 18M6 6l12 12"/></svg>Cancelled</span></div></div>
+</div>
+<div style="position: relative">
+<div class="bs-cal" style="border-radius: var(--radius-lg); overflow: hidden"><div class="bs-cal-head">Sun</div><div class="bs-cal-head">Mon</div><div class="bs-cal-head">Tue</div><div class="bs-cal-head">Wed</div><div class="bs-cal-head">Thu</div><div class="bs-cal-head">Fri</div><div class="bs-cal-head">Sat</div>
+<div class="bs-cal-day is-outside" style="min-height: 128px"><span class="bs-cal-num">30</span></div>
+<div class="bs-cal-day is-outside" style="min-height: 128px"><span class="bs-cal-num">31</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">01</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">02</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">03</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">04</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">05</span><a class="bs-chip bs-tone-paid" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>Paid</span><span class="bs-chip-title">Boda Benítez</span><span class="bs-chip-time">21:30 – 01:30</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">06</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">07</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">08</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">09</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">10</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">11</span><a class="bs-chip bs-tone-paid" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>Paid</span><span class="bs-chip-title">Bar La Esquina</span><span class="bs-chip-time">22:00 – 00:00</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">12</span><a class="bs-chip bs-tone-paid" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>Paid</span><span class="bs-chip-title">Cumpleaños Sosa</span><span class="bs-chip-time">21:00 – 23:00</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">13</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">14</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">15</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">16</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">17</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">18</span><a class="bs-chip bs-tone-confirmed" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><path d="M20 6 9 17l-5-5"/></svg>Confirmed</span><span class="bs-chip-title">Expo Feria CDE</span><span class="bs-chip-time">19:00 – 20:30</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">19</span><a class="bs-chip bs-tone-cancelled" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><path d="M18 6 6 18M6 6l12 12"/></svg>Cancelled</span><span class="bs-chip-title">Club Náutico</span><span class="bs-chip-time">20:00 – 22:00</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">20</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">21</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">22</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">23</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">24</span><a class="bs-chip bs-tone-pending" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pending</span><span class="bs-chip-title">15 años Martínez</span><span class="bs-chip-time">21:00 – 00:00</span></a></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">25</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">26</span><a class="bs-chip bs-tone-confirmed" href="event.html" aria-selected="true"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><path d="M20 6 9 17l-5-5"/></svg>Confirmed</span><span class="bs-chip-title">Casamiento Ríos</span><span class="bs-chip-time">22:00 – 02:00</span></a><a class="bs-chip bs-tone-paid" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>Paid</span><span class="bs-chip-title">Peña Guaraní</span><span class="bs-chip-time">19:00 – 20:30</span></a><button class="bs-cal-more">+1 more</button></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">27</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">28</span></div>
+<div class="bs-cal-day" style="min-height: 128px"><span class="bs-cal-num">29</span></div>
+<div class="bs-cal-day is-today" style="min-height: 128px"><span class="bs-cal-num">30</span></div>
+<div class="bs-cal-day is-outside" style="min-height: 128px"><span class="bs-cal-num">01</span></div>
+<div class="bs-cal-day is-outside" style="min-height: 128px"><span class="bs-cal-num">02</span><a class="bs-chip bs-tone-confirmed" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><path d="M20 6 9 17l-5-5"/></svg>Confirmed</span><span class="bs-chip-title">Bar La Esquina</span><span class="bs-chip-time">22:00 – 00:00</span></a></div>
+<div class="bs-cal-day is-outside" style="min-height: 128px"><span class="bs-cal-num">03</span><a class="bs-chip bs-tone-pending" href="event.html"><span class="bs-chip-status"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 11px; height: 11px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Pending</span><span class="bs-chip-title">Aniversario Colegio</span><span class="bs-chip-time">20:00 – 22:00</span></a></div>
+</div>
+<div class="bs-pop" role="dialog" aria-labelledby="pop-t" style="position: absolute; right: calc(100% / 7 + 12px); top: 300px; z-index: 5">
+<div class="bs-pop-bar"><div><button class="bs-iconbtn bs-iconbtn-sq" aria-label="Delete event"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button><a class="bs-iconbtn bs-iconbtn-sq" href="event.html" aria-label="Edit event"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></a></div><button class="bs-iconbtn bs-iconbtn-sq" aria-label="Close"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<h2 class="bs-pop-title" id="pop-t">Casamiento Ríos</h2>
+<p class="bs-pop-sub">Saturday, September 26 · 22:00 – 02:00<br>Salón Las Palmeras, Ciudad del Este</p>
+<dl class="bs-rows">
+<div class="bs-row"><dt>Pay</dt><dd class="bs-num">Gs. 4.500.000</dd></div>
+<div class="bs-row"><dt>Setlist</dt><dd>Boda clásica · 56m</dd></div>
+<div class="bs-row"><dt>Players</dt><dd>4 members + 1 guest</dd></div>
+<div class="bs-row"><dt>Status</dt><dd style="background: none; padding: 0"><span class="bs-status bs-tone-confirmed"><svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 12px; height: 12px"><path d="M20 6 9 17l-5-5"/></svg>Confirmed</span></dd></div>
+</dl>
+<a class="bs-btn bs-btn-secondary bs-btn-sm" href="event.html" style="margin-top: 16px; width: 100%; justify-content: center">Open event<svg class="bs-icon" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body>
+</html>
