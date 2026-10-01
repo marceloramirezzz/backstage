@@ -21,6 +21,7 @@ import { getPool } from "@/db/pool.ts";
 import { initials } from "@/lib/initials.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
+import { listMyInvitations } from "@/services/invitations.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { getProject, listProjects } from "@/services/projects.ts";
 import { HOME_SECTION, SECTIONS, type SectionPath } from "./sections.ts";
@@ -39,10 +40,11 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
   const user = await requireUser();
   const { projectId } = await params;
   const pool = getPool();
-  const [project, projects, permissions] = await Promise.all([
+  const [project, projects, permissions, invitations] = await Promise.all([
     getProject(pool, user, projectId),
     listProjects(pool, user),
     getPermissions(pool, user, projectId),
+    listMyInvitations(pool, user),
   ]).catch((err) => {
     if (err instanceof ServiceError && err.code === "not_found") notFound();
     throw err;
@@ -84,6 +86,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
         <ProjectSwitcher
           current={{ id: project.id, name: project.name }}
           projects={projects.map(({ id, name }) => ({ id, name }))}
+          invitationCount={invitations.length}
         />
       }
     >

@@ -20,11 +20,12 @@ export function DoorMark({ className = "h-7" }: { className?: string }) {
 }
 
 // Mark + "Backstage" (`bs-brand`).
-export function BrandLockup({ href }: { href: string }) {
+// `px-3` lines it up with the sidebar's links; the top bar sets it flush.
+export function BrandLockup({ href, className = "px-3" }: { href: string; className?: string }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-2.5 px-3 text-[17px]/[20px] font-semibold tracking-[-0.01em] text-ink no-underline hover:text-ink"
+      className={`flex items-center gap-2.5 text-[17px]/[20px] font-semibold tracking-[-0.01em] text-ink no-underline hover:text-ink ${className}`}
     >
       <DoorMark />
       Backstage
@@ -37,8 +38,13 @@ export function SpotlightMark({ className = "h-16" }: { className?: string }) {
   return <img src="/brand/backstage-door-spotlight.png" alt="Backstage" className={`w-auto ${className}`} />;
 }
 
-// `sm` is the handoff's `bs-avatar`; `md` the sidebar's User avatar.
-const avatarSizes = { sm: "size-6 text-[11px]/[14px]", md: "size-8 text-[12px]/[16px]" };
+// `sm` is the handoff's `bs-avatar`; `md` the sidebar's User avatar; `lg`
+// a Banda beside its Invitación.
+const avatarSizes = {
+  sm: "size-6 text-[11px]/[14px]",
+  md: "size-8 text-[12px]/[16px]",
+  lg: "size-9 text-[14px]/[20px]",
+};
 
 export function Avatar({
   initials,

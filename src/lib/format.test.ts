@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   formatClock,
   formatDuration,
+  formatExpiresIn,
   formatGuaranies,
   formatGuaraniesCompact,
   formatTimeRange,
@@ -119,5 +120,20 @@ describe("formatClock", () => {
 
   it("adds hours past an hour", () => {
     assert.equal(formatClock(3_600 + 4 * 60 + 12), "1:04:12");
+  });
+});
+
+describe("formatExpiresIn", () => {
+  const now = new Date("2026-09-30T12:00:00Z");
+  const hoursLater = (hours: number) => new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+  it("counts whole days left, rounding up", () => {
+    assert.equal(formatExpiresIn(hoursLater(7 * 24), now), "vence en 7 días");
+    assert.equal(formatExpiresIn(hoursLater(5 * 24 + 1), now), "vence en 6 días");
+  });
+
+  it("uses the singular for the last day", () => {
+    assert.equal(formatExpiresIn(hoursLater(24), now), "vence en 1 día");
+    assert.equal(formatExpiresIn(hoursLater(2), now), "vence en 1 día");
   });
 });

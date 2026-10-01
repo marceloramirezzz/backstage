@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import { normalizeEmail, type User } from "./accounts.ts";
 import { isViolation, ServiceError, UNIQUE_VIOLATION } from "./errors.ts";
 import { isUuid } from "./ids.ts";
-import { requirePermission } from "./permissions.ts";
+import { requirePermission, type RoleKind } from "./permissions.ts";
 import { PROJECT_COLUMNS, type Project } from "./projects.ts";
 import { hashToken, newToken } from "./tokens.ts";
 
@@ -25,13 +25,15 @@ export interface SentInvitation {
   token: string;
 }
 
-// An Invitation as its invitee sees it, from the emailed link or their own list.
+// An Invitation as its invitee sees it, from the emailed link or their own
+// list. One whose Role was deleted counts as expired, so it always has one.
 export interface ReceivedInvitation {
   id: string;
   email: string;
   projectId: string;
   projectName: string;
-  roleName: string | null;
+  roleKind: RoleKind;
+  roleName: string;
   invitedByName: string;
   expiresAt: Date;
 }
@@ -42,12 +44,17 @@ const INVITATION_ROLE = "LEFT JOIN roles r ON r.id = i.role_id";
 // What the invitee is shown, from invitations `i` and the tables joined in
 // RECEIVED_INVITATION_FROM.
 const RECEIVED_INVITATION_COLUMNS = `i.id, i.email, i.project_id AS "projectId",
-  p.name AS "projectName", r.name AS "roleName", u.display_name AS "invitedByName",
+  p.name AS "projectName", r.kind AS "roleKind", r.name AS "roleName", u.display_name AS "invitedByName",
   i.expires_at AS "expiresAt"`;
 const RECEIVED_INVITATION_FROM = `invitations i
   JOIN projects p ON p.id = i.project_id
   JOIN users u ON u.id = i.invited_by
   ${INVITATION_ROLE}`;
+
+// Whether the invitee can no longer accept Invitation `i`, $2 being `now`.
+// deleteRole judges expiry by the database clock, so a Role can be gone from
+// an Invitation this clock still calls pending; acceptInvitation refuses it.
+const EXPIRED_FOR_INVITEE = "(i.expires_at <= $2 OR i.role_id IS NULL)";
 
 // An Invitation as Admins see it, from invitations `i` joined by
 // INVITATION_ROLE. $1 is `now`.
@@ -219,20 +226,27 @@ export async function revokeInvitation(
 
 // The pending Invitation behind an emailed link, for its landing page. Needs
 // no login, so an invitee without an account can see what they're joining.
-// A resent Invitation's old link stops working.
+// A link to an accepted, revoked or expired Invitation says which, so the
+// page can tell the invitee what to do; a resent Invitation's old link is
+// simply invalid.
 export async function getInvitationByToken(
   pool: Pool,
   token: string,
   now: Date = new Date(),
 ): Promise<ReceivedInvitation> {
-  const { rows } = await pool.query<ReceivedInvitation & { expired: boolean }>(
-    `SELECT ${RECEIVED_INVITATION_COLUMNS}, i.expires_at <= $2 AS expired
+  const { rows } = await pool.query<
+    ReceivedInvitation & { expired: boolean; revoked: boolean; accepted: boolean }
+  >(
+    `SELECT ${RECEIVED_INVITATION_COLUMNS}, ${EXPIRED_FOR_INVITEE} AS expired,
+       i.revoked_at IS NOT NULL AS revoked, i.accepted_at IS NOT NULL AS accepted
      FROM ${RECEIVED_INVITATION_FROM}
-     WHERE i.token_hash = $1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL`,
+     WHERE i.token_hash = $1`,
     [hashToken(token), now],
   );
   if (!rows[0]) throw new ServiceError("invalid_token", "This Invitation link is not valid");
-  const { expired, ...invitation } = rows[0];
+  const { expired, revoked, accepted, ...invitation } = rows[0];
+  if (accepted) throw new ServiceError("invitation_accepted", "This Invitation was already accepted");
+  if (revoked) throw new ServiceError("invitation_revoked", "This Invitation was revoked");
   if (expired) throw expiredError();
   return invitation;
 }
@@ -251,7 +265,7 @@ export async function listMyInvitations(
   const { rows } = await pool.query<ReceivedInvitation>(
     `SELECT ${RECEIVED_INVITATION_COLUMNS} FROM ${RECEIVED_INVITATION_FROM}
      WHERE i.email = $1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL
-       AND i.expires_at > $2
+       AND NOT ${EXPIRED_FOR_INVITEE}
      ORDER BY p.name, i.created_at`,
     [user.email, now],
   );

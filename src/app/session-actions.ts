@@ -66,8 +66,9 @@ export async function createAccount(_prev: SignUpState, form: FormData): Promise
   redirect(safeReturnPath(String(form.get("volver") ?? "")) ?? "/");
 }
 
-export async function signOut(): Promise<void> {
+// A `volver` field sends the next User to sign in back to that page.
+export async function signOut(form?: FormData): Promise<void> {
   const token = await clearSessionCookie();
   if (token) await logOut(getPool(), token);
-  redirect(signInPath());
+  redirect(signInPath(safeReturnPath(String(form?.get("volver") ?? ""))));
 }

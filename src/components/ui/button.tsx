@@ -6,14 +6,16 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "inve
 export type ButtonSize = "md" | "sm" | "lg";
 
 const base =
-  "inline-flex items-center gap-2 rounded-pill border border-transparent font-medium whitespace-nowrap cursor-pointer no-underline transition-[background-color,box-shadow,border-color] duration-150 disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none aria-disabled:opacity-45 aria-disabled:cursor-not-allowed";
+  "inline-flex items-center gap-2 rounded-pill border font-medium whitespace-nowrap cursor-pointer no-underline transition-[background-color,box-shadow,border-color] duration-150 disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none aria-disabled:opacity-45 aria-disabled:cursor-not-allowed";
 
+// Each sets its own border color: two border-color utilities on one element
+// resolve by stylesheet order, not class order.
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-spotlight text-on-spotlight hover:shadow-glow",
+  primary: "border-transparent bg-spotlight text-on-spotlight hover:shadow-glow",
   secondary: "bg-transparent text-ink border-line-control hover:bg-bg-3",
-  ghost: "bg-transparent text-ink-muted hover:bg-bg-3 hover:text-ink",
+  ghost: "border-transparent bg-transparent text-ink-muted hover:bg-bg-3 hover:text-ink",
   danger: "bg-transparent text-status-cancelled border-status-cancelled hover:bg-status-cancelled-bg",
-  inverse: "bg-ink text-bg-0",
+  inverse: "border-transparent bg-ink text-bg-0",
 };
 
 // `lg` is the 44px height the sign-in form and the inverse button use.

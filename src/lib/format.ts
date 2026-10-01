@@ -62,3 +62,11 @@ export function formatClock(seconds: number): string {
   const clock = `${pad(minutes)}:${pad(seconds % 60)}`;
   return hours ? `${hours}:${clock}` : clock;
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// `vence en 6 días`: whole days left until `expiresAt`, rounded up.
+export function formatExpiresIn(expiresAt: Date, now: Date = new Date()): string {
+  const days = Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_MS));
+  return `vence en ${days} ${days === 1 ? "día" : "días"}`;
+}

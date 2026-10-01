@@ -12,6 +12,8 @@ export type ServiceErrorCode =
   | "role_in_use"
   | "owner_protected"
   | "invitation_expired"
+  | "invitation_revoked"
+  | "invitation_accepted"
   | "already_member"
   | "already_invited";
 

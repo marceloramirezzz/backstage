@@ -217,6 +217,7 @@ describe("acceptInvitation", () => {
 
     const landing = await getInvitationByToken(db.pool, token);
     assert.equal(landing.projectName, "accept");
+    assert.equal(landing.roleKind, "member");
     assert.equal(landing.roleName, "Member");
     assert.equal(landing.email, "singer@example.com");
     assert.equal(landing.invitedByName, owner.displayName);
@@ -226,6 +227,7 @@ describe("acceptInvitation", () => {
     assert.deepEqual(await getProject(db.pool, singer, project.id), project);
     assert.equal((await getPermissions(db.pool, singer, project.id)).administer, false);
     assert.deepEqual(await listInvitations(db.pool, owner, project.id), []);
+    await assert.rejects(getInvitationByToken(db.pool, token), { code: "invitation_accepted" });
   });
 
   it("refuses a User who hasn't verified the invited email", async () => {
@@ -409,6 +411,31 @@ describe("resendInvitation", () => {
       code: "not_found",
     });
   });
+
+  it("treats a pending Invitation whose Role is gone as expired", async () => {
+    const { owner, project } = await band(db, "deleted-role-landing");
+    const roadie = await createRole(db.pool, owner, project.id, {
+      name: "Roadie",
+      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+    });
+    const sentAt = new Date(Date.now() - 8 * DAY_MS);
+    const [{ token }] = await sendInvitations(
+      db.pool,
+      owner,
+      project.id,
+      [{ email: "gone-role@example.com", roleId: roadie.id }],
+      sentAt,
+    );
+    // The database clock let the Role go; this clock still calls it pending.
+    await deleteRole(db.pool, owner, project.id, roadie.id);
+    const stillPending = daysAfter(sentAt, 6);
+    const invitee = await verifiedUser(db, "gone-role@example.com");
+
+    await assert.rejects(getInvitationByToken(db.pool, token, stillPending), {
+      code: "invitation_expired",
+    });
+    assert.deepEqual(await listMyInvitations(db.pool, invitee, stillPending), []);
+  });
 });
 
 describe("revokeInvitation", () => {
@@ -429,7 +456,7 @@ describe("revokeInvitation", () => {
 
     assert.deepEqual(await listInvitations(db.pool, owner, project.id), []);
     await assert.rejects(acceptInvitation(db.pool, gone, invitation.id), { code: "not_found" });
-    await assert.rejects(getInvitationByToken(db.pool, token), { code: "invalid_token" });
+    await assert.rejects(getInvitationByToken(db.pool, token), { code: "invitation_revoked" });
     await sendInvitations(db.pool, owner, project.id, [
       { email: "gone@example.com", roleId: memberRole.id },
     ]);
@@ -499,10 +526,10 @@ describe("listMyInvitations", () => {
     const mine = await listMyInvitations(db.pool, popular);
 
     assert.deepEqual(
-      mine.map((i) => [i.projectName, i.roleName, i.invitedByName]),
+      mine.map((i) => [i.projectName, i.roleKind, i.roleName, i.invitedByName]),
       [
-        ["Cumbia band", "Member", cumbia.owner.displayName],
-        ["Rock band", "Admin", rock.owner.displayName],
+        ["Cumbia band", "member", "Member", cumbia.owner.displayName],
+        ["Rock band", "admin", "Admin", rock.owner.displayName],
       ],
     );
   });
