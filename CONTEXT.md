@@ -35,7 +35,7 @@ An item in the Repertoire: `name`, `key` (optional, since a band may not have se
 _Spanish UI_: Canción; `name` is **Título**, `key` is **Tono**; intensities Tranquila / Media / Bailable / Enérgica
 
 **Selection**:
-An item in the Repertoire representing a medley: an ordered list of full Songs (no nesting — a Selection can't contain another Selection) played back to back. Has its own `name`, `duration`, and `intensity`, entered directly (not computed, not inherited) — no `key` (a medley doesn't have one true key).
+An item in the Repertoire representing a medley: an ordered list of at least two full Songs, each at most once (no nesting — a Selection can't contain another Selection), played back to back. Has its own `name`, `duration` (up to 99:59), and `intensity`, entered directly (not computed, not inherited) — no `key` (a medley doesn't have one true key).
 _Spanish UI_: Enganchado (avoid "Selección")
 
 **Setlist**:
