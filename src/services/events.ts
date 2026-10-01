@@ -184,10 +184,18 @@ export async function deleteEvent(
   throw new ServiceError("forbidden", "Only an Admin can delete a Paid Event");
 }
 
-function requireEdit(permissions: Permissions) {
+export function requireEdit(permissions: Permissions) {
   if (!permissions.editRepertoireSetlistsEvents) {
     throw new ServiceError("forbidden", "You don't have permission to do that");
   }
+}
+
+// Throws not found unless the Project has this Event.
+export async function requireEvent(db: Pool | PoolClient, projectId: string, eventId: string) {
+  const { rows } = isUuid(eventId)
+    ? await db.query("SELECT 1 FROM events WHERE id = $1 AND project_id = $2", [eventId, projectId])
+    : { rows: [] };
+  if (!rows[0]) throw new ServiceError("not_found", "Event not found");
 }
 
 async function findEvent(

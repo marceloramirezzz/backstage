@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { getPool } from "@/db/pool.ts";
+import { text, whole } from "@/lib/form.ts";
 import { requireUser } from "@/lib/session.ts";
 import { addGuest, removeGuest, setAttending } from "@/services/attendance.ts";
 import { ServiceError } from "@/services/errors.ts";
@@ -19,7 +20,7 @@ const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
 };
 
 // The message for a failed call, or a rethrow when it isn't expected.
-async function run(act: () => Promise<unknown>): Promise<string | undefined> {
+async function errorOf(act: () => Promise<unknown>): Promise<string | undefined> {
   try {
     await act();
   } catch (err) {
@@ -37,7 +38,7 @@ export async function setMemberAttending(
   attending: boolean,
 ): Promise<{ error?: string }> {
   const user = await requireUser();
-  return { error: await run(() => setAttending(getPool(), user, projectId, eventId, userId, attending)) };
+  return { error: await errorOf(() => setAttending(getPool(), user, projectId, eventId, userId, attending)) };
 }
 
 export async function addEventGuest(
@@ -45,10 +46,11 @@ export async function addEventGuest(
   form: FormData,
 ): Promise<AttendanceActionState> {
   const user = await requireUser();
-  const field = (name: string) => String(form.get(name) ?? "");
-  const amount = form.has("amount") ? (field("amount").trim() === "" ? 0 : Number(field("amount"))) : undefined;
-  const error = await run(() =>
-    addGuest(getPool(), user, field("projectId"), field("eventId"), { name: field("name"), amount }),
+  // The field is only there for those who may set the amount; blank means none.
+  const amountText = text(form, "amount");
+  const amount = !form.has("amount") ? undefined : amountText.trim() === "" ? 0 : whole(amountText);
+  const error = await errorOf(() =>
+    addGuest(getPool(), user, text(form, "projectId"), text(form, "eventId"), { name: text(form, "name"), amount }),
   );
   return error ? { ...prev, error } : { done: prev.done + 1 };
 }
@@ -59,5 +61,5 @@ export async function removeEventGuest(
   guestId: string,
 ): Promise<{ error?: string }> {
   const user = await requireUser();
-  return { error: await run(() => removeGuest(getPool(), user, projectId, eventId, guestId)) };
+  return { error: await errorOf(() => removeGuest(getPool(), user, projectId, eventId, guestId)) };
 }

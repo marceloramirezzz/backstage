@@ -38,7 +38,7 @@ export function AttendanceSection({
   const { members, guests } = attendance;
   const played = members.filter((m) => m.attending).length + guests.length;
 
-  const change = (act: () => Promise<{ error?: string }>) =>
+  const applyChange = (act: () => Promise<{ error?: string }>) =>
     startTransition(async () => setError((await act()).error));
 
   return (
@@ -68,7 +68,7 @@ export function AttendanceSection({
                   checked={m.attending}
                   disabled={!canEdit || own || pending}
                   onChange={(e) =>
-                    change(() => setMemberAttending(projectId, eventId, m.userId, e.target.checked))
+                    applyChange(() => setMemberAttending(projectId, eventId, m.userId, e.target.checked))
                   }
                 />
                 <span
@@ -78,7 +78,9 @@ export function AttendanceSection({
                   {initials(m.displayName)}
                 </span>
                 <span className="min-w-0 grow truncate">{m.displayName}</span>
-                <span className="text-[12px]/[16px] text-ink-muted">{m.roleName}</span>
+                <span className="text-[12px]/[16px] text-ink-muted">
+                  {own && canEdit ? "No editás tu propia asistencia" : m.roleName}
+                </span>
               </label>
             </li>
           );
@@ -98,9 +100,10 @@ export function AttendanceSection({
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="min-h-11 min-w-11 justify-center"
                     aria-label={`Quitar a ${g.name}`}
                     disabled={pending}
-                    onClick={() => change(() => removeEventGuest(projectId, eventId, g.id))}
+                    onClick={() => applyChange(() => removeEventGuest(projectId, eventId, g.id))}
                   >
                     <X {...iconProps} />
                   </Button>
