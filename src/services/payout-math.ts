@@ -71,7 +71,8 @@ export function computePayout(input: PayoutInput): PayoutResult {
   const members = attendees.map((a) => ({ userId: a.userId, roleId: a.roleId, amount: 0 }));
 
   if (overAllocated) {
-    for (const role of roles) role.amount = 0;
+    // Roles keep the fixed amount they claim, so the shortfall can be shown; nobody is paid it.
+    for (const role of roles) if (role.kind === "percentage") role.amount = 0;
     return {
       net,
       overAllocated,
