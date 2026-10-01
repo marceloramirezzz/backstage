@@ -24,7 +24,8 @@ export const MAX_SONG_DURATION_SECONDS = 99 * 60 + 59;
 // Expects the songs table aliased as `s`.
 const SONG_COLUMNS = `s.id, s.name, s.key, s.duration_seconds AS "durationSeconds", s.intensity`;
 
-export interface SongFilter {
+// Narrows a Repertoire listing: Songs or Selections.
+export interface RepertoireFilter {
   // Any part of the name, ignoring case and accents.
   search?: string;
   intensity?: Intensity;
@@ -35,7 +36,7 @@ export async function listSongs(
   pool: Pool,
   user: User,
   projectId: string,
-  filter: SongFilter = {},
+  filter: RepertoireFilter = {},
 ): Promise<Song[]> {
   await getPermissions(pool, user, projectId); // Members only
   const search = filter.search?.trim() || null;
@@ -51,7 +52,7 @@ export async function listSongs(
 }
 
 // Makes LIKE's wildcards match themselves.
-const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
+export const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
 
 export async function createSong(
   pool: Pool,

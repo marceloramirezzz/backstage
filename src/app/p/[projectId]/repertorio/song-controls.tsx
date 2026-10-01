@@ -21,7 +21,7 @@ import { iconProps } from "@/components/ui/icon-props.ts";
 import { Menu } from "@/components/ui/menu.tsx";
 import { INTENSITY_LABELS } from "@/lib/intensity-label.ts";
 import { INTENSITIES, type Song } from "@/services/songs.ts";
-import { removeSong, saveSong, type DeleteSongState, type SongFormState } from "./actions.ts";
+import { removeSong, saveSong, type DeleteState, type SongFormState } from "./actions.ts";
 
 // The page's primary action: opens the form for a new Canción.
 export function NewSongButton({ projectId }: { projectId: string }) {
@@ -193,7 +193,7 @@ function DeleteSongForm({
   song: Song;
   onClose: () => void;
 }) {
-  const [state, action, pending] = useActionState<DeleteSongState, FormData>(removeSong, {
+  const [state, action, pending] = useActionState<DeleteState, FormData>(removeSong, {
     deleted: 0,
   });
 

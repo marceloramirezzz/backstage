@@ -5,15 +5,34 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Input, Select } from "@/components/ui/field.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
+import { Segmented } from "@/components/ui/segmented.tsx";
 import { INTENSITY_LABELS } from "@/lib/intensity-label.ts";
 import { INTENSITIES } from "@/services/songs.ts";
 
 const SEARCH_DELAY_MS = 250;
 
-// Search by title and filter by intensity, kept in the URL (`q`,
-// `intensidad`) so a filtered list can be shared. Without JavaScript, Enter still
-// submits the form as a plain GET.
-export function RepertoireFilters({ search, intensity }: { search: string; intensity: string }) {
+// What the Repertorio lists: everything, only Canciones or only Enganchados.
+export type RepertoireType = "" | "canciones" | "enganchados";
+
+const TYPES: { value: RepertoireType; label: string }[] = [
+  { value: "", label: "Todo" },
+  { value: "canciones", label: "Canciones" },
+  { value: "enganchados", label: "Enganchados" },
+];
+
+// Show only Canciones or Enganchados, search by title and filter by
+// intensity, kept in the URL (`tipo`, `q`, `intensidad`) so a filtered list
+// can be shared. Without JavaScript, Enter still submits the search and
+// intensity as a plain GET.
+export function RepertoireFilters({
+  type,
+  search,
+  intensity,
+}: {
+  type: RepertoireType;
+  search: string;
+  intensity: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -41,6 +60,13 @@ export function RepertoireFilters({ search, intensity }: { search: string; inten
         update("q", query.trim());
       }}
     >
+      <Segmented
+        label="Mostrar"
+        options={TYPES}
+        value={type}
+        onChange={(value) => update("tipo", value)}
+      />
+      {type && <input type="hidden" name="tipo" value={type} />}
       <label className="relative min-w-0 flex-[0_1_320px] max-sm:flex-auto">
         <Search {...iconProps} className="absolute top-2.5 left-3 text-ink-subtle" />
         <Input
