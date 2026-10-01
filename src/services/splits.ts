@@ -44,7 +44,7 @@ export interface FullPayout {
     amount: number;
     attendees: { userId: string; displayName: string; amount: number }[];
   }[];
-  guests: { id: string; name: string; amount: number }[];
+  guests: { id: string; name: string; amount: number; fixedAmount: number }[];
   // Whoever takes what rounding leaves over.
   remainderRecipient: string | null;
 }
@@ -297,6 +297,7 @@ async function previewEvent(db: Db, projectId: string, eventId: string): Promise
       id: g.id,
       name: g.name,
       amount: result.guests.find((x) => x.id === g.id)!.amount,
+      fixedAmount: g.amount,
     })),
     remainderRecipient: recipient,
   };

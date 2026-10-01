@@ -99,7 +99,7 @@ export function RepartoSection({
           />
         ))}
         {payout.guests.map((g) => (
-          <Line key={g.id} minus label={`Suplente · ${g.name} (fijo)`} amount={result.overAllocated ? 0 : g.amount} />
+          <Line key={g.id} minus label={`Suplente · ${g.name} (fijo)`} amount={g.fixedAmount} />
         ))}
         <div className="border-t border-line pt-2">
           <Line label="A repartir" amount={result.remainder} strong />

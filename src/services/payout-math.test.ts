@@ -106,6 +106,8 @@ describe("computePayout", () => {
     assert.equal(r.remainder, 0);
     assert.ok(r.members.every((m) => m.amount === 0));
     assert.ok(r.guests.every((g) => g.amount === 0));
+    // The claims stay visible: Sofía's 300.000 is still what the Role is owed.
+    assert.equal(r.roles.find((x) => x.roleId === "roadie")?.amount, 300_000);
   });
 
   it("flags an Event whose Expenses exceed its pay", () => {
