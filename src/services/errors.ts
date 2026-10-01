@@ -16,7 +16,8 @@ export type ServiceErrorCode =
   | "invitation_accepted"
   | "already_member"
   | "already_invited"
-  | "song_in_use";
+  | "song_in_use"
+  | "selection_in_use";
 
 // An expected, user-facing failure of a service call. Callers switch on `code`.
 export class ServiceError extends Error {

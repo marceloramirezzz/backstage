@@ -56,6 +56,7 @@ export interface DeleteState {
 const DELETE_ERRORS: Partial<Record<ServiceError["code"], string>> = {
   song_in_use:
     "Esta canción está en un Enganchado o una Setlist. Sacala de ahí antes de eliminarla.",
+  selection_in_use: "Este enganchado está en una Setlist. Sacalo de ahí antes de eliminarlo.",
   forbidden: "Tu rol no puede editar el repertorio.",
 };
 
