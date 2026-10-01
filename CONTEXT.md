@@ -31,8 +31,8 @@ Determines what a Member can do within a Project. **Admin** and **Member** are f
 _Spanish UI_: Rol; the built-ins are Admin and Miembro
 
 **Song**:
-An item in the Repertoire: `name`, `key`, `duration`, `intensity` (calm / medium / danceable / energetic). Editing a Song updates it everywhere it's referenced live (Selections and template Setlists), but never the copies inside Event Setlist snapshots. A Song that belongs to a Selection or Setlist can't be deleted until it's removed from them.
-_Spanish UI_: Canción
+An item in the Repertoire: `name`, `key` (optional, since a band may not have settled on one), `duration` (up to 99:59), `intensity` (calm / medium / danceable / energetic). Editing a Song updates it everywhere it's referenced live (Selections and template Setlists), but never the copies inside Event Setlist snapshots. A Song that belongs to a Selection or Setlist can't be deleted until it's removed from them.
+_Spanish UI_: Canción; `name` is **Título**, `key` is **Tono**; intensities Tranquila / Media / Bailable / Enérgica
 
 **Selection**:
 An item in the Repertoire representing a medley: an ordered list of full Songs (no nesting — a Selection can't contain another Selection) played back to back. Has its own `name`, `duration`, and `intensity`, entered directly (not computed, not inherited) — no `key` (a medley doesn't have one true key).

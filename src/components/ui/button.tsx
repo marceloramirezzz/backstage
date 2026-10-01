@@ -44,16 +44,21 @@ export function Button({
   return <button type={type} className={buttonClass({ variant, size, className })} {...props} />;
 }
 
-// Icon-only round button (`bs-iconbtn`). Always give it an `aria-label`.
+// Icon-only round button (`bs-iconbtn`), or the smaller square one table
+// rows use (`bs-iconbtn-sq`). Always give it an `aria-label`.
 export function IconButton({
   className = "",
   type = "button",
+  square = false,
   ...props
-}: ComponentProps<"button"> & { "aria-label": string }) {
+}: ComponentProps<"button"> & { "aria-label": string; square?: boolean }) {
+  const shape = square
+    ? "size-[30px] rounded-md border-line"
+    : "size-9 rounded-pill border-line-control";
   return (
     <button
       type={type}
-      className={`inline-grid size-9 shrink-0 cursor-pointer place-items-center rounded-pill border border-line-control bg-transparent text-ink-muted hover:bg-bg-3 hover:text-ink ${className}`}
+      className={`inline-grid shrink-0 cursor-pointer place-items-center border bg-transparent text-ink-muted hover:bg-bg-3 hover:text-ink ${shape} ${className}`}
       {...props}
     />
   );
