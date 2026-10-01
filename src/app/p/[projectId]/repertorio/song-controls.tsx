@@ -3,14 +3,12 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   createContext,
-  startTransition,
   use,
   useActionState,
   useCallback,
   useEffect,
   useEffectEvent,
   useState,
-  type FormEvent,
   type ReactNode,
 } from "react";
 import { FormMessage } from "@/components/auth-screen.tsx";
@@ -20,6 +18,7 @@ import { Field, Input, Select } from "@/components/ui/field.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { Menu } from "@/components/ui/menu.tsx";
 import { INTENSITY_LABELS } from "@/lib/intensity-label.ts";
+import { submitKeepingFields } from "@/lib/submit-keeping-fields.ts";
 import { INTENSITIES, type Song } from "@/services/songs.ts";
 import { removeSong, saveSong, type DeleteState, type SongFormState } from "./actions.ts";
 
@@ -114,17 +113,9 @@ function SongForm({
     if (state.saved) onSaved();
   }, [state.saved]);
 
-  // Submitted by hand so a failed save keeps what was typed (a form action
-  // would reset the fields).
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    startTransition(() => action(data));
-  };
-
   const duration = song?.durationSeconds;
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submitKeepingFields(action)} className="flex flex-col gap-4">
       <input type="hidden" name="projectId" value={projectId} />
       {song && <input type="hidden" name="songId" value={song.id} />}
       <Field label="Título">

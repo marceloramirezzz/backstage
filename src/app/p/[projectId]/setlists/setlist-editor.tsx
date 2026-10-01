@@ -2,24 +2,18 @@
 
 import { ArrowDown, ArrowUp, Copy, GripVertical, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import {
-  startTransition,
-  useActionState,
-  useRef,
-  useState,
-  type DragEvent,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useActionState, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { FormMessage } from "@/components/auth-screen.tsx";
 import { Button, IconButton } from "@/components/ui/button.tsx";
+import { Combobox } from "@/components/ui/combobox.tsx";
 import { Dialog } from "@/components/ui/dialog.tsx";
-import { Field, Input, Select } from "@/components/ui/field.tsx";
+import { Field, Input } from "@/components/ui/field.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { IntensityMeter } from "@/components/ui/intensity-meter.tsx";
 import { Tag } from "@/components/ui/tag.tsx";
 import { formatClock } from "@/lib/format.ts";
 import { INTENSITY_LABELS } from "@/lib/intensity-label.ts";
+import { submitKeepingFields } from "@/lib/submit-keeping-fields.ts";
 import type { Selection } from "@/services/selections.ts";
 import type { Setlist, SetlistItem } from "@/services/setlists.ts";
 import type { Song } from "@/services/songs.ts";
@@ -32,6 +26,7 @@ import {
   type SetlistFormState,
 } from "./actions.ts";
 import { formatTotal } from "./total.ts";
+import { useUnsavedChanges } from "./unsaved-changes.tsx";
 
 // Opens the form for a new, empty Setlist.
 export function NewSetlistButton({ projectId }: { projectId: string }) {
@@ -51,9 +46,15 @@ export function NewSetlistButton({ projectId }: { projectId: string }) {
 
 function NewSetlistForm({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const [state, action, pending] = useActionState<SetlistActionState, FormData>(addSetlist, {});
+  const { dirty } = useUnsavedChanges();
   return (
     <form onSubmit={submitKeepingFields(action)} className="flex flex-col gap-4">
       <input type="hidden" name="projectId" value={projectId} />
+      {dirty && (
+        <p className="m-0 text-[14px]/[20px] text-ink-muted">
+          La setlist abierta tiene cambios sin guardar: se pierden al crear esta.
+        </p>
+      )}
       <Field label="Nombre">
         <Input name="name" placeholder="Ej.: Boda clásica" required data-autofocus />
       </Field>
@@ -72,15 +73,6 @@ function NewSetlistForm({ projectId, onClose }: { projectId: string; onClose: ()
     </form>
   );
 }
-
-// Submits by hand so a failed save keeps what was typed (a form action would
-// reset the fields).
-const submitKeepingFields =
-  (action: (data: FormData) => void) => (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    startTransition(() => action(data));
-  };
 
 // An item while editing, keyed so a Song that comes back twice stays two rows.
 interface Row {
@@ -136,6 +128,11 @@ export function SetlistEditor({
     name.trim() !== setlist.name ||
     (category.trim() || null) !== setlist.category ||
     rows.map((r) => itemValue(r.entry)).join() !== setlist.items.map(itemValue).join();
+
+  // Lets the page ask before anything throws these edits away.
+  const { setDirty } = useUnsavedChanges();
+  useEffect(() => setDirty(dirty), [dirty, setDirty]);
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   const move = (from: number, to: number) => {
     if (from === to || to < 0 || to >= rows.length) return;
@@ -386,7 +383,8 @@ function ItemRow({
   );
 }
 
-// Picks a Canción or Enganchado from the Repertoire and adds it at the end.
+// Finds a Canción or Enganchado in the Repertoire by title and adds it at
+// the end.
 function AddItem({
   projectId,
   songs,
@@ -406,32 +404,24 @@ function AddItem({
       </p>
     );
   }
+  const option = (entry: SetlistItem) => ({
+    value: itemValue(entry),
+    label: entry.item.name,
+    detail: formatClock(entry.item.durationSeconds),
+  });
   return (
-    <Select
-      aria-label="Agregar canción o enganchado"
-      value=""
-      onChange={(e) => onAdd(e.target.value)}
-    >
-      <option value="">Agregar canción o enganchado…</option>
-      {songs.length > 0 && (
-        <optgroup label="Canciones">
-          {songs.map((song) => (
-            <option key={song.id} value={`song:${song.id}`}>
-              {song.name} · {formatClock(song.durationSeconds)}
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {selections.length > 0 && (
-        <optgroup label="Enganchados">
-          {selections.map((selection) => (
-            <option key={selection.id} value={`selection:${selection.id}`}>
-              {selection.name} · {formatClock(selection.durationSeconds)}
-            </option>
-          ))}
-        </optgroup>
-      )}
-    </Select>
+    <Combobox
+      label="Agregar canción o enganchado"
+      placeholder="Agregar canción o enganchado…"
+      groups={[
+        { label: "Canciones", options: songs.map((item) => option({ kind: "song", item })) },
+        {
+          label: "Enganchados",
+          options: selections.map((item) => option({ kind: "selection", item })),
+        },
+      ]}
+      onSelect={onAdd}
+    />
   );
 }
 
@@ -453,7 +443,8 @@ function DuplicateForm({
       <input type="hidden" name="setlistId" value={setlist.id} />
       <p className="m-0 text-[14px]/[20px] text-ink-muted">
         Copia <span className="font-medium text-ink">{setlist.name}</span> con su categoría y sus
-        ítems, tal como está guardada.{dirty && " Los cambios sin guardar no se copian."}
+        ítems, tal como está guardada.
+        {dirty && " Tus cambios sin guardar no se copian y se pierden al abrir la copia."}
       </p>
       <Field label="Nombre de la copia">
         <Input name="name" defaultValue={`${setlist.name} (copia)`} required data-autofocus />
