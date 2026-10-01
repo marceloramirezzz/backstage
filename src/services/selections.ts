@@ -11,6 +11,7 @@ import {
   type RepertoireFilter,
   type Song,
 } from "./songs.ts";
+import { inTransaction } from "./transaction.ts";
 
 // A medley: Songs played back to back, with its own name, duration and
 // intensity, and no key.
@@ -34,7 +35,7 @@ export interface SelectionInput {
 export const MIN_SELECTION_SONGS = 2;
 
 // Expects the selections table aliased as `sel`.
-const SELECTION_COLUMNS = `sel.id, sel.name, sel.duration_seconds AS "durationSeconds",
+export const SELECTION_COLUMNS = `sel.id, sel.name, sel.duration_seconds AS "durationSeconds",
   sel.intensity,
   (SELECT json_agg(json_build_object('id', s.id, 'name', s.name, 'key', s.key,
        'durationSeconds', s.duration_seconds, 'intensity', s.intensity) ORDER BY ss.position)
@@ -105,7 +106,8 @@ export async function updateSelection(
   });
 }
 
-// Deletes a Selection. Its Songs stay in the Repertoire.
+// Deletes a Selection. Its Songs stay in the Repertoire. A Selection still in
+// a Setlist can't be deleted until it's removed from it.
 export async function deleteSelection(
   pool: Pool,
   user: User,
@@ -114,26 +116,19 @@ export async function deleteSelection(
 ): Promise<void> {
   await requirePermission(pool, user, projectId, "editRepertoireSetlistsEvents");
   if (!isUuid(selectionId)) throw new ServiceError("not_found", "Selection not found");
-  const { rowCount } = await pool.query("DELETE FROM selections WHERE id = $1 AND project_id = $2", [
-    selectionId,
-    projectId,
-  ]);
-  if (!rowCount) throw new ServiceError("not_found", "Selection not found");
-}
-
-async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+  let rowCount: number | null;
   try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
+    ({ rowCount } = await pool.query("DELETE FROM selections WHERE id = $1 AND project_id = $2", [
+      selectionId,
+      projectId,
+    ]));
   } catch (err) {
-    await client.query("ROLLBACK");
+    if (isViolation(err, FOREIGN_KEY_VIOLATION, "setlist_items_selection")) {
+      throw new ServiceError("selection_in_use", "Remove this Selection from its Setlists first");
+    }
     throw err;
-  } finally {
-    client.release();
   }
+  if (!rowCount) throw new ServiceError("not_found", "Selection not found");
 }
 
 async function insertSongs(
