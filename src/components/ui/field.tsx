@@ -36,8 +36,10 @@ export function Field({
   );
 }
 
+// Width and radius are set per control: two such utilities on one element
+// resolve by stylesheet order, not class order.
 const control =
-  "w-full rounded-md border border-line-control bg-bg-2 px-3 text-[14px]/[20px] text-ink group-data-error:border-status-cancelled";
+  "border border-line-control bg-bg-2 px-3 text-[14px]/[20px] text-ink group-data-error:border-status-cancelled";
 
 const heights = { md: "h-9", lg: "h-11" };
 
@@ -48,7 +50,7 @@ export function Input({
 }: Omit<ComponentProps<"input">, "size"> & { size?: keyof typeof heights }) {
   return (
     <input
-      className={`${control} ${heights[size]} placeholder:text-ink-subtle ${className}`}
+      className={`${control} w-full rounded-md ${heights[size]} placeholder:text-ink-subtle ${className}`}
       {...props}
     />
   );
@@ -65,7 +67,7 @@ export function Select({
 }: ComponentProps<"select"> & { pill?: boolean }) {
   return (
     <select
-      className={`${control} h-9 ${chevron} ${pill ? "w-auto rounded-pill" : ""} ${className}`}
+      className={`${control} h-9 ${chevron} ${pill ? "w-auto rounded-pill" : "w-full rounded-md"} ${className}`}
       {...props}
     />
   );
