@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPool } from "@/db/pool.ts";
+import { text, whole } from "@/lib/form.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import {
@@ -31,11 +32,6 @@ function errorMessage(err: unknown, messages: ErrorMessages): string {
   if (error) return error;
   throw err;
 }
-
-const text = (form: FormData, name: string) => String(form.get(name) ?? "");
-
-// Whole numbers from a number field; NaN when it's blank or not one.
-const whole = (value: string) => (value.trim() === "" ? NaN : Number(value));
 
 // Adds an Evento and opens it, or edits one when the form carries its id.
 // `setlistId` is a template's id; on an edit, `keep` leaves the copy as is and

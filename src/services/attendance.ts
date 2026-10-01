@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import type { User } from "./accounts.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
-import { getPermissions, type Permissions } from "./permissions.ts";
+import { requireEdit, requireEvent } from "./events.ts";
+import { getPermissions } from "./permissions.ts";
 
 export interface AttendanceMember {
   userId: string;
@@ -75,22 +76,20 @@ export async function setAttending(
     throw new ServiceError("forbidden", "You can't edit your own Attendance");
   }
   await requireEvent(pool, projectId, eventId);
-  if (!isUuid(memberUserId)) throw new ServiceError("not_found", "Member not found");
-  const { rowCount } = await pool.query(
-    attending
-      ? `DELETE FROM event_absences a USING memberships m
-         WHERE a.event_id = $1 AND a.user_id = $2 AND m.project_id = $3 AND m.user_id = $2`
-      : `INSERT INTO event_absences (event_id, project_id, user_id)
-         SELECT $1, $3, m.user_id FROM memberships m WHERE m.project_id = $3 AND m.user_id = $2
-         ON CONFLICT DO NOTHING`,
-    [eventId, memberUserId, projectId],
-  );
-  if (rowCount) return;
-  const { rows } = await pool.query("SELECT 1 FROM memberships WHERE project_id = $1 AND user_id = $2", [
-    projectId,
-    memberUserId,
-  ]);
+  const { rows } = isUuid(memberUserId)
+    ? await pool.query("SELECT 1 FROM memberships WHERE project_id = $1 AND user_id = $2", [
+        projectId,
+        memberUserId,
+      ])
+    : { rows: [] };
   if (!rows[0]) throw new ServiceError("not_found", "Member not found");
+  await pool.query(
+    attending
+      ? "DELETE FROM event_absences WHERE event_id = $1 AND user_id = $2"
+      : `INSERT INTO event_absences (event_id, project_id, user_id) VALUES ($1, $3, $2)
+         ON CONFLICT DO NOTHING`,
+    attending ? [eventId, memberUserId] : [eventId, memberUserId, projectId],
+  );
 }
 
 export async function addGuest(
@@ -134,17 +133,4 @@ export async function removeGuest(
     ? await pool.query("DELETE FROM event_guests WHERE id = $1 AND event_id = $2", [guestId, eventId])
     : { rowCount: 0 };
   if (!rowCount) throw new ServiceError("not_found", "Guest not found");
-}
-
-function requireEdit(permissions: Permissions) {
-  if (!permissions.editRepertoireSetlistsEvents) {
-    throw new ServiceError("forbidden", "You don't have permission to do that");
-  }
-}
-
-async function requireEvent(pool: Pool, projectId: string, eventId: string) {
-  const { rows } = isUuid(eventId)
-    ? await pool.query("SELECT 1 FROM events WHERE id = $1 AND project_id = $2", [eventId, projectId])
-    : { rows: [] };
-  if (!rows[0]) throw new ServiceError("not_found", "Event not found");
 }
