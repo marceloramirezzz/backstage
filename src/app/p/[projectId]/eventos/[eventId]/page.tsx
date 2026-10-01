@@ -11,12 +11,14 @@ import { DEFAULT_TIME_ZONE, formatClock, formatDuration, formatGuaranies } from 
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import { getAttendance } from "@/services/attendance.ts";
+import { getExpenses } from "@/services/expenses.ts";
 import { getEvent, type Event } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { listSetlists } from "@/services/setlists.ts";
 import { formatTotal } from "../../setlists/total.ts";
 import { AttendanceSection } from "./attendance.tsx";
 import { EventControls } from "./event-controls.tsx";
+import { ExpensesSection } from "./expenses.tsx";
 
 export const metadata: Metadata = { title: "Evento · Backstage" };
 
@@ -42,6 +44,7 @@ export default async function EventPage({
   });
   const canEdit = permissions.editRepertoireSetlistsEvents;
   const attendance = await getAttendance(pool, user, projectId, eventId);
+  const expenses = await getExpenses(pool, user, projectId, eventId);
   const setlists = canEdit ? await listSetlists(pool, user, projectId) : [];
 
   return (
@@ -86,6 +89,14 @@ export default async function EventPage({
         canEdit={canEdit}
         canSetAmount={permissions.seeTotalPayExpenses}
       />
+      {expenses && (
+        <ExpensesSection
+          projectId={projectId}
+          eventId={event.id}
+          summary={expenses}
+          canEdit={canEdit}
+        />
+      )}
       <SetlistSection event={event} />
     </main>
   );
