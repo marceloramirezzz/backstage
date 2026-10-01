@@ -87,7 +87,7 @@ describe("payout splits", () => {
       "preview-rodrigo@example.com": 1_068_750,
       "preview-sofia@example.com": 300_000,
     });
-    assert.deepEqual(p.guests, [{ id: p.guests[0].id, name: "Nahuel", amount: 350_000 }]);
+    assert.deepEqual(p.guests, [{ id: p.guests[0].id, name: "Nahuel", amount: 350_000, fixedAmount: 350_000 }]);
   });
 
   it("shares a skipped Role's percentage when its Members didn't play", async () => {
