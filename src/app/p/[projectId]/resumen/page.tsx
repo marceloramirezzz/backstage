@@ -1,8 +1,8 @@
 import { CircleDollarSign, Clock, Mic } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { buttonClass } from "@/components/ui/button.tsx";
+import { StatTile } from "@/components/ui/stat-tile.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { addMonths, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
@@ -16,31 +16,6 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 const todayIn = () => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TIME_ZONE }).format(new Date());
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-function StatTile({
-  label,
-  icon,
-  value,
-  foot,
-  lead,
-}: {
-  label: string;
-  icon: ReactNode;
-  value: string;
-  foot: string;
-  lead?: boolean;
-}) {
-  return (
-    <div className={`grid gap-2 rounded-lg border bg-bg-2 p-4 ${lead ? "border-spotlight" : "border-line"}`}>
-      <span className={`flex items-center gap-2 text-[13px]/[18px] font-medium ${lead ? "text-spotlight-ink" : "text-ink-muted"}`}>
-        {icon}
-        {label}
-      </span>
-      <span className="font-mono text-[28px]/[32px] font-medium tracking-[-0.02em] tabular-nums">{value}</span>
-      <span className="text-[12px]/[16px] text-ink-muted">{foot}</span>
-    </div>
-  );
-}
 
 // Shows, Cobrado and Por cobrar for a month or a year. A Rol that can't see
 // the total pay gets only its own amounts.
