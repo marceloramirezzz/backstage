@@ -7,6 +7,7 @@ import { AcceptInvitationForm } from "@/components/invitations/accept-invitation
 import { InvitationSummary } from "@/components/invitations/invitation-summary.tsx";
 import { Avatar, BrandLockup } from "@/components/ui/brand.tsx";
 import { buttonClass, IconButton } from "@/components/ui/button.tsx";
+import { SettingsLink } from "@/components/ui/settings-link.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { TopBar } from "@/components/ui/top-bar.tsx";
 import { VerifyEmailBanner } from "@/components/verify-email-banner.tsx";
@@ -40,6 +41,7 @@ export default async function WelcomePage() {
                 Ir a tus bandas
               </Link>
             )}
+            <SettingsLink />
             <Avatar tone="neutral" initials={initials(user.displayName)} size="md" />
             <form action={signOut}>
               <IconButton type="submit" aria-label="Cerrar sesión" title="Cerrar sesión" className="border-line">

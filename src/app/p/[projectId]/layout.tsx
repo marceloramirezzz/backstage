@@ -15,6 +15,7 @@ import { AppShell } from "@/components/app-shell.tsx";
 import { ProjectSwitcher } from "@/components/ui/project-switcher.tsx";
 import { Avatar, BrandLockup } from "@/components/ui/brand.tsx";
 import { IconButton } from "@/components/ui/button.tsx";
+import { SettingsLink } from "@/components/ui/settings-link.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { NavGroup, Sidebar } from "@/components/ui/sidebar.tsx";
 import { getPool } from "@/db/pool.ts";
@@ -82,6 +83,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
   return (
     <AppShell
       sidebar={sidebar}
+      topBarEnd={<SettingsLink />}
       topBar={
         <ProjectSwitcher
           current={{ id: project.id, name: project.name }}

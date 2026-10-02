@@ -11,6 +11,8 @@ import {
   requestVerificationEmail,
   resetPassword,
   signInWithGoogle,
+  setDisplayName,
+  setTheme,
   signUp,
   verifyEmail,
   type GoogleProfile,
@@ -366,6 +368,13 @@ describe("accounts", () => {
       assert.equal(byGoogle.user.id, user.id);
     });
 
+    it("won't add a password that's too short", async () => {
+      const { user } = await signInWithGoogle(db.pool, googleProfile("ola@example.com", { name: "Ola" }));
+
+      await assert.rejects(addPassword(db.pool, user, { password: "short" }), { name: "ServiceError", code: "invalid_input" });
+      await assert.rejects(logIn(db.pool, { email: "ola@example.com", password: "short" }), { code: "invalid_credentials" });
+    });
+
     it("won't replace a password the User already has", async () => {
       const { user } = await signUp(db.pool, mailer, { email: "noa@example.com", password: "old password", displayName: "Noa" });
 
@@ -374,6 +383,48 @@ describe("accounts", () => {
         code: "password_already_set",
       });
       await logIn(db.pool, { email: "noa@example.com", password: "old password" });
+    });
+  });
+
+  describe("settings", () => {
+    it("starts every User on the system theme", async () => {
+      const { user } = await signUp(db.pool, mailer, { email: "tea@example.com", password: "a password", displayName: "Tea" });
+
+      assert.equal(user.theme, "system");
+    });
+
+    it("remembers the chosen theme for every later session", async () => {
+      const { user } = await signUp(db.pool, mailer, { email: "uri@example.com", password: "a password", displayName: "Uri" });
+
+      await setTheme(db.pool, user, "light");
+
+      const { user: second } = await logIn(db.pool, { email: "uri@example.com", password: "a password" });
+      assert.equal(second.theme, "light");
+      await setTheme(db.pool, user, "dark");
+      const { user: third } = await logIn(db.pool, { email: "uri@example.com", password: "a password" });
+      assert.equal(third.theme, "dark");
+    });
+
+    it("rejects a theme that doesn't exist", async () => {
+      const { user } = await signUp(db.pool, mailer, { email: "val@example.com", password: "a password", displayName: "Val" });
+
+      await assert.rejects(setTheme(db.pool, user, "neon" as "dark"), { name: "ServiceError", code: "invalid_input" });
+      assert.equal((await logIn(db.pool, { email: "val@example.com", password: "a password" })).user.theme, "system");
+    });
+
+    it("changes the display name, trimmed", async () => {
+      const { user, sessionToken } = await signUp(db.pool, mailer, { email: "wen@example.com", password: "a password", displayName: "Wen" });
+
+      await setDisplayName(db.pool, user, "  Wendy Ruiz ");
+
+      assert.equal((await getSessionUser(db.pool, sessionToken))?.displayName, "Wendy Ruiz");
+    });
+
+    it("won't blank the display name", async () => {
+      const { user } = await signUp(db.pool, mailer, { email: "xia@example.com", password: "a password", displayName: "Xia" });
+
+      await assert.rejects(setDisplayName(db.pool, user, "   "), { name: "ServiceError", code: "invalid_input" });
+      assert.equal((await logIn(db.pool, { email: "xia@example.com", password: "a password" })).user.displayName, "Xia");
     });
   });
 });

@@ -3,7 +3,8 @@
 /* Design tokens from docs/design/design-system/tokens.css. Dark is the
    default; light shares every name. */
 :root,
-[data-theme="dark"] {
+[data-theme="dark"],
+[data-theme="system"] {
   --bg-0: #0c0c0e;
   --bg-1: #131316;
   --bg-2: #1b1b1f;
@@ -33,6 +34,8 @@
   color-scheme: dark;
 }
 
+/* Light applies when chosen, or when the theme is `system` and the OS
+   prefers it. The two blocks must stay identical. */
 [data-theme="light"] {
   --bg-0: #f6f6f3;
   --bg-1: #ffffff;
@@ -61,6 +64,51 @@
   --shadow-pop: 0 16px 40px rgba(20, 20, 20, 0.14), 0 0 0 1px rgba(20, 20, 20, 0.06);
   --shadow-glow: 0 0 0 4px rgba(255, 214, 10, 0.28);
   color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --bg-0: #f6f6f3;
+    --bg-1: #ffffff;
+    --bg-2: #ffffff;
+    --bg-3: #ecece8;
+    --line: #e4e4e0;
+    --line-control: #85858e;
+    --ink: #17171a;
+    --ink-muted: #52525c;
+    --ink-subtle: #686872;
+    --spotlight: #ffd60a;
+    --on-spotlight: #141414;
+    --spotlight-ink: #7a5f00;
+    --spotlight-soft: rgba(255, 214, 10, 0.18);
+    --focus-ring: #7a5f00;
+    --hot: #c8175f;
+    --on-hot: #ffffff;
+    --status-pending: #9a5700;
+    --status-pending-bg: rgba(245, 165, 36, 0.12);
+    --status-confirmed: #16703a;
+    --status-confirmed-bg: rgba(62, 207, 110, 0.12);
+    --status-paid: #1c5cc0;
+    --status-paid-bg: rgba(90, 165, 255, 0.12);
+    --status-cancelled: #bf2a2a;
+    --status-cancelled-bg: rgba(255, 107, 107, 0.12);
+    --shadow-pop: 0 16px 40px rgba(20, 20, 20, 0.14), 0 0 0 1px rgba(20, 20, 20, 0.06);
+    --shadow-glow: 0 0 0 4px rgba(255, 214, 10, 0.28);
+    color-scheme: light;
+  }
+}
+
+/* `light:` styles what only differs in the light theme, whether chosen or
+   followed from the OS. */
+@custom-variant light {
+  &:where([data-theme="light"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: light) {
+    &:where([data-theme="system"] *) {
+      @slot;
+    }
+  }
 }
 
 /* Tokens as Tailwind utilities: bg-bg-1, text-ink-muted, rounded-pill,

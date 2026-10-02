@@ -3,6 +3,7 @@
 // the files under public/.
 export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "p",
+  "ajustes",
   "bienvenida",
   "crear-cuenta",
   "ingresar",
