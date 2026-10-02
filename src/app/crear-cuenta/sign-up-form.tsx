@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { createAccount, type SignUpState } from "@/app/session-actions.ts";
 import { authCardClass, FormMessage } from "@/components/auth-screen.tsx";
+import { GoogleSignIn } from "@/components/google-sign-in.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, Input } from "@/components/ui/field.tsx";
 
@@ -20,6 +21,7 @@ export function SignUpForm({
 
   return (
     <form action={action} className={authCardClass}>
+      <GoogleSignIn returnPath={returnPath} />
       {returnPath && <input type="hidden" name="volver" value={returnPath} />}
       <Field label="Nombre" hint="Así te van a ver en tus bandas.">
         <Input
