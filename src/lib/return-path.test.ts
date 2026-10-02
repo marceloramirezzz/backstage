@@ -17,6 +17,9 @@ describe("safeReturnPath", () => {
       "//evil.example/p/123",
       "/\\evil.example",
       "javascript:alert(1)",
+      "/\t/evil.example",
+      "/\n/evil.example",
+      "/\r/evil.example",
     ]) {
       assert.equal(safeReturnPath(unsafe), null, String(unsafe));
     }

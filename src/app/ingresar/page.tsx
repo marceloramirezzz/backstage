@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthScreen } from "@/components/auth-screen.tsx";
+import { googleErrorMessage } from "@/lib/google-errors.ts";
 import { safeReturnPath, withReturnPath } from "@/lib/return-path.ts";
 import { getCurrentUser } from "@/lib/session.ts";
 import { SignInForm } from "./sign-in-form.tsx";
@@ -9,7 +10,7 @@ import { SignInForm } from "./sign-in-form.tsx";
 export const metadata: Metadata = { title: "Ingresar · Backstage" };
 
 export default async function SignInPage({ searchParams }: PageProps<"/ingresar">) {
-  const { volver } = await searchParams;
+  const { volver, google } = await searchParams;
   const returnPath = safeReturnPath(typeof volver === "string" ? volver : null);
   if (await getCurrentUser()) redirect(returnPath ?? "/");
 
@@ -24,7 +25,10 @@ export default async function SignInPage({ searchParams }: PageProps<"/ingresar"
         </>
       }
     >
-      <SignInForm returnPath={returnPath} />
+      <SignInForm
+        returnPath={returnPath}
+        googleError={googleErrorMessage(typeof google === "string" ? google : undefined)}
+      />
     </AuthScreen>
   );
 }
