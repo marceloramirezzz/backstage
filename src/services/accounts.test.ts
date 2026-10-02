@@ -7,7 +7,9 @@ import {
   getSessionUser,
   logIn,
   logOut,
+  requestPasswordReset,
   requestVerificationEmail,
+  resetPassword,
   signInWithGoogle,
   signUp,
   verifyEmail,
@@ -135,6 +137,100 @@ describe("accounts", () => {
 
       await requestVerificationEmail(db.pool, mailer, "lu@example.com");
       await requestVerificationEmail(db.pool, mailer, "nobody-here@example.com");
+
+      assert.equal(mailer.sent.length, sentBefore);
+    });
+  });
+
+  describe("password reset", () => {
+    const resetToken = (email: string) => linkToken(sentTo(mailer, email).at(-1)!, "/restablecer");
+    const newUser = (email: string) =>
+      signUp(db.pool, mailer, { email, password: "old password", displayName: email });
+
+    it("emails a reset link in Spanish, and the new password works after following it", async () => {
+      await newUser("ada@example.com");
+
+      await requestPasswordReset(db.pool, mailer, "ADA@example.com");
+
+      const email = sentTo(mailer, "ada@example.com").at(-1)!;
+      assert.equal(email.subject, "Restablecé tu contraseña de Backstage");
+      assert.match(email.body, /^Hola, ada@example.com:/);
+      await resetPassword(db.pool, resetToken("ada@example.com"), "new password");
+      await logIn(db.pool, { email: "ada@example.com", password: "new password" });
+      await assert.rejects(logIn(db.pool, { email: "ada@example.com", password: "old password" }), {
+        code: "invalid_credentials",
+      });
+    });
+
+    it("signs the User in and ends their other sessions", async () => {
+      const { sessionToken: old } = await newUser("bo@example.com");
+      await requestPasswordReset(db.pool, mailer, "bo@example.com");
+
+      const { user, sessionToken } = await resetPassword(db.pool, resetToken("bo@example.com"), "new password");
+
+      assert.equal((await getSessionUser(db.pool, sessionToken))?.id, user.id);
+      assert.equal(await getSessionUser(db.pool, old), null);
+    });
+
+    it("works once", async () => {
+      await newUser("cy@example.com");
+      await requestPasswordReset(db.pool, mailer, "cy@example.com");
+      const token = resetToken("cy@example.com");
+
+      await resetPassword(db.pool, token, "new password");
+
+      await assert.rejects(resetPassword(db.pool, token, "another password"), { code: "invalid_token" });
+      await assert.rejects(resetPassword(db.pool, "not-a-real-token", "new password"), {
+        code: "invalid_token",
+      });
+      await logIn(db.pool, { email: "cy@example.com", password: "new password" });
+    });
+
+    it("expires after 1 hour", async () => {
+      const requestedAt = new Date("2026-01-01T12:00:00Z");
+      const at = (minutes: number) => new Date(requestedAt.getTime() + minutes * 60 * 1000);
+      await newUser("di@example.com");
+      await newUser("ed@example.com");
+      await requestPasswordReset(db.pool, mailer, "di@example.com", requestedAt);
+      await requestPasswordReset(db.pool, mailer, "ed@example.com", requestedAt);
+
+      await resetPassword(db.pool, resetToken("di@example.com"), "new password", at(59));
+      await assert.rejects(resetPassword(db.pool, resetToken("ed@example.com"), "new password", at(60)), {
+        code: "invalid_token",
+      });
+    });
+
+    it("lets only the newest link work after asking again", async () => {
+      await newUser("flo@example.com");
+      await requestPasswordReset(db.pool, mailer, "flo@example.com");
+      const first = resetToken("flo@example.com");
+      await requestPasswordReset(db.pool, mailer, "flo@example.com");
+
+      await assert.rejects(resetPassword(db.pool, first, "new password"), { code: "invalid_token" });
+      await resetPassword(db.pool, resetToken("flo@example.com"), "new password");
+    });
+
+    it("keeps the link usable when the new password is too short", async () => {
+      await newUser("gwen@example.com");
+      await requestPasswordReset(db.pool, mailer, "gwen@example.com");
+      const token = resetToken("gwen@example.com");
+
+      await assert.rejects(resetPassword(db.pool, token, "short"), { code: "invalid_input" });
+
+      await resetPassword(db.pool, token, "long enough now");
+    });
+
+    it("sends nothing for an unknown email or a User with no password, alike", async () => {
+      await signInWithGoogle(db.pool, {
+        googleId: "google-hal",
+        email: "hal@example.com",
+        emailVerified: true,
+        name: "Hal",
+      });
+      const sentBefore = mailer.sent.length;
+
+      await requestPasswordReset(db.pool, mailer, "hal@example.com");
+      await requestPasswordReset(db.pool, mailer, "nobody-here@example.com");
 
       assert.equal(mailer.sent.length, sentBefore);
     });

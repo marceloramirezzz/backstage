@@ -25,6 +25,10 @@ const VERIFICATION_TTL_HOURS = 24;
 const VERIFICATION_TTL_MS = VERIFICATION_TTL_HOURS * 60 * 60 * 1000;
 const verificationExpiry = (now: Date) => new Date(now.getTime() + VERIFICATION_TTL_MS);
 
+const RESET_TTL_HOURS = 1;
+const RESET_TTL_MS = RESET_TTL_HOURS * 60 * 60 * 1000;
+const resetExpiry = (now: Date) => new Date(now.getTime() + RESET_TTL_MS);
+
 const USER_COLUMNS = `id, email, display_name AS "displayName",
   email_verified_at IS NOT NULL AS "emailVerified"`;
 
@@ -141,6 +145,78 @@ El enlace vence en ${VERIFICATION_TTL_HOURS} horas. Sin verificarlo no vas a pod
 Si no creaste una cuenta en Backstage, ignorá este correo.
 `,
   };
+}
+
+// Emails a password reset link to the User with this email, if they have a
+// password; earlier links stop working. Quietly does nothing otherwise, so
+// the caller can't tell whether the email has an account.
+export async function requestPasswordReset(
+  pool: Pool,
+  mailer: Mailer,
+  email: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const resetToken = newToken();
+  const { rows } = await pool.query<User>(
+    `WITH target AS (
+       SELECT ${USER_COLUMNS} FROM users WHERE email = $1 AND password_hash IS NOT NULL
+     ), token AS (
+       INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
+       SELECT $2, id, $3 FROM target
+       ON CONFLICT (user_id) DO UPDATE
+       SET token_hash = excluded.token_hash, expires_at = excluded.expires_at,
+         created_at = now()
+     )
+     SELECT * FROM target`,
+    [normalizeEmail(email), hashToken(resetToken), resetExpiry(now)],
+  );
+  if (rows[0]) await mailer.send(passwordResetEmail(mailer, rows[0], resetToken));
+}
+
+function passwordResetEmail(mailer: Mailer, user: User, token: string): EmailMessage {
+  const link = new URL(`/restablecer?token=${token}`, mailer.appUrl);
+  return {
+    to: user.email,
+    subject: "Restablecé tu contraseña de Backstage",
+    body: `Hola, ${user.displayName}:
+
+Para elegir una contraseña nueva, abrí este enlace:
+
+${link}
+
+El enlace vence en ${RESET_TTL_HOURS} hora y sirve una sola vez.
+
+Si no pediste cambiar tu contraseña, ignorá este correo: la actual sigue funcionando.
+`,
+  };
+}
+
+// Follows a password reset link: sets the new password, ends every session
+// the User had and signs them in. Each link works once, within 1 hour.
+export async function resetPassword(
+  pool: Pool,
+  token: string,
+  password: string,
+  now: Date = new Date(),
+): Promise<{ user: User; sessionToken: string }> {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new ServiceError("invalid_input", `Password must have at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+  const { rows } = await pool.query<User>(
+    `WITH used AS (
+       DELETE FROM password_reset_tokens WHERE token_hash = $1
+       RETURNING user_id, expires_at
+     ), ended AS (
+       DELETE FROM sessions WHERE user_id = (SELECT user_id FROM used WHERE expires_at > $3)
+     )
+     UPDATE users SET password_hash = $2
+     WHERE id = (SELECT user_id FROM used WHERE expires_at > $3)
+     RETURNING ${USER_COLUMNS}`,
+    [hashToken(token), await hashPassword(password), now],
+  );
+  const user = rows[0];
+  if (!user) throw new ServiceError("invalid_token", "This password reset link is not valid");
+  return { user, sessionToken: await startSession(pool, user.id, now) };
 }
 
 // Starts a 30-day session. Unverified Users may log in.

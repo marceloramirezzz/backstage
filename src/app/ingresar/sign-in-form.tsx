@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { signIn, type SignInState } from "@/app/session-actions.ts";
 import { authCardClass, FormMessage } from "@/components/auth-screen.tsx";
@@ -50,6 +51,9 @@ export function SignInForm({ returnPath }: { returnPath: string | null }) {
       <Field label="Contraseña">
         <Input size="lg" type="password" name="password" autoComplete="current-password" required />
       </Field>
+      <Link href="/recuperar" className="-mt-1 self-start text-[13px] text-ink-muted hover:text-ink">
+        ¿Olvidaste tu contraseña?
+      </Link>
       {state.error && <FormMessage tone="error">{state.error}</FormMessage>}
       <Button type="submit" variant="primary" size="lg" className="justify-center" disabled={pending}>
         {pending ? "Ingresando…" : "Ingresar"}
