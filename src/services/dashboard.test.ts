@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
+import { setAttending } from "./attendance.ts";
 import { getDashboard } from "./dashboard.ts";
 import { createEvent, updateEvent } from "./events.ts";
 import { addExpense } from "./expenses.ts";
@@ -101,7 +102,6 @@ describe("Dashboard", () => {
   it("counts only the Events the restricted Member played in toward their amounts", async () => {
     const b = await band("absent");
     await b.gig("2026-09-05", 1_000_000, "paid");
-    const { setAttending } = await import("./attendance.ts");
     const second = await b.gig("2026-09-12", 1_000_000, "paid");
     await setAttending(db.pool, b.owner, b.project.id, second.id, b.sofia.id, false);
     const d = await getDashboard(db.pool, b.sofia, b.project.id, SEPTEMBER);
