@@ -7,7 +7,7 @@ import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { Tag } from "@/components/ui/tag.tsx";
 import { getPool } from "@/db/pool.ts";
 import { eventTimeRange, formatLongDate } from "@/lib/calendar.ts";
-import { DEFAULT_TIME_ZONE, formatClock, formatDuration, formatGuaranies } from "@/lib/format.ts";
+import { formatClock, formatDuration, formatGuaranies, formatShortDate } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import { getAttendance } from "@/services/attendance.ts";
@@ -23,11 +23,6 @@ import { ExpensesSection } from "./expenses.tsx";
 import { RepartoSection } from "./reparto.tsx";
 
 export const metadata: Metadata = { title: "Evento · Backstage" };
-
-const copiedOn = (iso: string) =>
-  new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "short", timeZone: DEFAULT_TIME_ZONE })
-    .format(new Date(iso))
-    .replace(".", "");
 
 // One Evento: its details and the Setlist it copied. Every Member sees it;
 // Members who can edit events also edit, move the status of and delete it.
@@ -205,7 +200,7 @@ function SetlistSection({ event }: { event: Event }) {
       <p className="m-0 flex flex-wrap justify-between gap-2 border-t border-line pt-3 text-[13px]/[18px] text-ink-muted">
         <span>
           {count} {count === 1 ? "ítem" : "ítems"} · copiada de «{setlist.name}» el{" "}
-          {copiedOn(setlist.copiedAt)}
+          {formatShortDate(setlist.copiedAt)}
         </span>
         <span className="font-mono">{formatTotal(setlist.durationSeconds)}</span>
       </p>

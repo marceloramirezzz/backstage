@@ -3,6 +3,8 @@ import type { User } from "./accounts.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
 import { requireEdit, requireEvent } from "./events.ts";
+import { inTransaction } from "./transaction.ts";
+import { syncSnapshot } from "./payout-snapshots.ts";
 import { getPermissions, type Permissions } from "./permissions.ts";
 
 // A cost tied to one Event.
@@ -65,11 +67,14 @@ export async function addExpense(
     throw new ServiceError("invalid_input", "An Expense's amount must be a whole amount of Guaraníes");
   }
   await requireEvent(pool, projectId, eventId);
-  const { rows } = await pool.query<{ id: string }>(
-    "INSERT INTO event_expenses (event_id, name, amount) VALUES ($1, $2, $3) RETURNING id",
-    [eventId, name, amount],
-  );
-  return { id: rows[0].id, name, amount };
+  return inTransaction(pool, async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      "INSERT INTO event_expenses (event_id, name, amount) VALUES ($1, $2, $3) RETURNING id",
+      [eventId, name, amount],
+    );
+    await syncSnapshot(client, projectId, eventId);
+    return { id: rows[0].id, name, amount };
+  });
 }
 
 export async function removeExpense(
@@ -81,10 +86,13 @@ export async function removeExpense(
 ): Promise<void> {
   requireEditAndSee(await getPermissions(pool, user, projectId));
   await requireEvent(pool, projectId, eventId);
-  const { rowCount } = isUuid(expenseId)
-    ? await pool.query("DELETE FROM event_expenses WHERE id = $1 AND event_id = $2", [expenseId, eventId])
-    : { rowCount: 0 };
-  if (!rowCount) throw new ServiceError("not_found", "Expense not found");
+  await inTransaction(pool, async (client) => {
+    const { rowCount } = isUuid(expenseId)
+      ? await client.query("DELETE FROM event_expenses WHERE id = $1 AND event_id = $2", [expenseId, eventId])
+      : { rowCount: 0 };
+    if (!rowCount) throw new ServiceError("not_found", "Expense not found");
+    await syncSnapshot(client, projectId, eventId);
+  });
 }
 
 // You can't edit what you can't see.

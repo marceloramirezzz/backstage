@@ -70,3 +70,9 @@ export function formatExpiresIn(expiresAt: Date, now: Date = new Date()): string
   const days = Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_MS));
   return `vence en ${days} ${days === 1 ? "día" : "días"}`;
 }
+
+// `2 oct`: a moment's day and short month in the Project's time zone.
+export const formatShortDate = (iso: string) =>
+  new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "short", timeZone: DEFAULT_TIME_ZONE })
+    .format(new Date(iso))
+    .replace(".", "");
