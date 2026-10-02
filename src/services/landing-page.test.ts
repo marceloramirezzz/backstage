@@ -4,7 +4,14 @@ import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import { createEvent, updateEvent } from "./events.ts";
 import { acceptInvitation, sendInvitations } from "./invitations.ts";
-import { getLandingSettings, getPublicLanding, saveLandingSettings } from "./landing-page.ts";
+import {
+  getLandingContent,
+  getLandingSettings,
+  getPublicLanding,
+  saveLandingAlbum,
+  saveLandingContacts,
+  saveLandingSettings,
+} from "./landing-page.ts";
 import { createProject } from "./projects.ts";
 import { listRoles } from "./roles.ts";
 import { createSelection } from "./selections.ts";
@@ -106,6 +113,149 @@ describe("Landing page", () => {
     });
   });
 
+  async function adminAndMember(name: string) {
+    const b = await band(name);
+    const member = await verifiedUser(db, `${name}-member@example.com`);
+    const roles = await listRoles(db.pool, b.owner, b.project.id);
+    const [{ invitation }] = await sendInvitations(db.pool, b.owner, b.project.id, [
+      { email: member.email, roleId: roles.find((r) => r.kind === "member")!.id },
+    ]);
+    await acceptInvitation(db.pool, member, invitation.id);
+    return { ...b, member };
+  }
+
+  describe("album", () => {
+    const photo = (n: number, caption: string | null = null) => ({ url: `https://img.example/${n}.jpg`, caption });
+
+    it("starts empty", async () => {
+      const b = await band("album-empty");
+      assert.deepEqual(await getLandingContent(db.pool, b.owner, b.project.id), { photos: [], contacts: [] });
+    });
+
+    it("keeps the order and captions it was saved with, trimming captions and blanking empty ones", async () => {
+      const b = await band("album-order");
+      const saved = await saveLandingAlbum(db.pool, b.owner, b.project.id, [
+        photo(3, "  Festival del Lago "),
+        photo(1),
+        photo(2, "   "),
+      ]);
+      const expected = [photo(3, "Festival del Lago"), photo(1), photo(2)];
+      assert.deepEqual(saved, expected);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).photos, expected);
+    });
+
+    it("replaces the whole album on each save, and can empty it", async () => {
+      const b = await band("album-replace");
+      await saveLandingAlbum(db.pool, b.owner, b.project.id, [photo(1), photo(2), photo(3)]);
+      await saveLandingAlbum(db.pool, b.owner, b.project.id, [photo(2, "Reordered"), photo(1)]);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).photos, [photo(2, "Reordered"), photo(1)]);
+      await saveLandingAlbum(db.pool, b.owner, b.project.id, []);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).photos, []);
+    });
+
+    it("rejects photos that are not https addresses, or are too many, and keeps the old album", async () => {
+      const b = await band("album-invalid");
+      await saveLandingAlbum(db.pool, b.owner, b.project.id, [photo(1)]);
+      for (const url of ["", "http://img.example/1.jpg", "javascript:alert(1)", "img.example/1.jpg", "https://a b"]) {
+        await assert.rejects(saveLandingAlbum(db.pool, b.owner, b.project.id, [{ url, caption: null }]), {
+          code: "invalid_input",
+        });
+      }
+      await assert.rejects(
+        saveLandingAlbum(db.pool, b.owner, b.project.id, [{ url: photo(1).url, caption: "x".repeat(141) }]),
+        { code: "invalid_input" },
+      );
+      await assert.rejects(
+        saveLandingAlbum(db.pool, b.owner, b.project.id, Array.from({ length: 31 }, (_, i) => photo(i))),
+        { code: "invalid_input" },
+      );
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).photos, [photo(1)]);
+    });
+
+    it("is for Admins only, to read or write", async () => {
+      const b = await adminAndMember("album-perms");
+      await assert.rejects(saveLandingAlbum(db.pool, b.member, b.project.id, [photo(1)]), { code: "forbidden" });
+      await assert.rejects(getLandingContent(db.pool, b.member, b.project.id), { code: "forbidden" });
+    });
+  });
+
+  describe("contacts", () => {
+    it("keeps presets and Other with its label, in order", async () => {
+      const b = await band("contacts-order");
+      const saved = await saveLandingContacts(db.pool, b.owner, b.project.id, [
+        { platform: "whatsapp", label: null, value: " +595 981 123-456 " },
+        { platform: "instagram", label: null, value: "@losdelvalle.py" },
+        { platform: "other", label: " Telegram ", value: "https://t.me/losdelvalle" },
+      ]);
+      const expected = [
+        { platform: "whatsapp", label: null, value: "+595 981 123-456" },
+        { platform: "instagram", label: null, value: "@losdelvalle.py" },
+        { platform: "other", label: "Telegram", value: "https://t.me/losdelvalle" },
+      ];
+      assert.deepEqual(saved, expected);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).contacts, expected);
+    });
+
+    it("drops a label given to a preset", async () => {
+      const b = await band("contacts-label");
+      const [saved] = await saveLandingContacts(db.pool, b.owner, b.project.id, [
+        { platform: "email", label: "Reservas", value: "band@example.com" },
+      ]);
+      assert.equal(saved.label, null);
+    });
+
+    it("replaces the whole list on each save", async () => {
+      const b = await band("contacts-replace");
+      await saveLandingContacts(db.pool, b.owner, b.project.id, [
+        { platform: "email", label: null, value: "a@example.com" },
+        { platform: "phone", label: null, value: "0981123456" },
+      ]);
+      await saveLandingContacts(db.pool, b.owner, b.project.id, [{ platform: "phone", label: null, value: "0981123456" }]);
+      assert.equal((await getLandingContent(db.pool, b.owner, b.project.id)).contacts.length, 1);
+    });
+
+    it("rejects unknown platforms, Other without a label, bad values and too many, keeping the old list", async () => {
+      const b = await band("contacts-invalid");
+      await saveLandingContacts(db.pool, b.owner, b.project.id, [{ platform: "email", label: null, value: "a@example.com" }]);
+      const bad = [
+        { platform: "myspace", label: null, value: "x" },
+        { platform: "other", label: null, value: "x" },
+        { platform: "other", label: "  ", value: "x" },
+        { platform: "other", label: "Telegram", value: " " },
+        { platform: "email", label: null, value: "not-an-email" },
+        { platform: "website", label: null, value: "javascript:alert(1)" },
+        { platform: "phone", label: null, value: "12" },
+        { platform: "other", label: "x".repeat(41), value: "x" },
+        { platform: "other", label: "Telegram", value: "x".repeat(201) },
+      ];
+      for (const contact of bad) {
+        await assert.rejects(
+          // @ts-expect-error: deliberately not a ContactPlatform for some of them
+          saveLandingContacts(db.pool, b.owner, b.project.id, [contact]),
+          { code: "invalid_input" },
+        );
+      }
+      await assert.rejects(
+        saveLandingContacts(
+          db.pool,
+          b.owner,
+          b.project.id,
+          Array.from({ length: 13 }, () => ({ platform: "email" as const, label: null, value: "a@example.com" })),
+        ),
+        { code: "invalid_input" },
+      );
+      assert.equal((await getLandingContent(db.pool, b.owner, b.project.id)).contacts.length, 1);
+    });
+
+    it("is for Admins only", async () => {
+      const b = await adminAndMember("contacts-perms");
+      await assert.rejects(
+        saveLandingContacts(db.pool, b.member, b.project.id, [{ platform: "email", label: null, value: "a@example.com" }]),
+        { code: "forbidden" },
+      );
+    });
+  });
+
   describe("public page", () => {
     const TODAY = "2026-10-02";
 
@@ -178,6 +328,38 @@ describe("Landing page", () => {
         ],
       );
       assert.equal(page?.appearances[0].location, "Bar La Esquina");
+    });
+
+    it("shows the album and contacts in order, live, with no draft", async () => {
+      const b = await publicBand("album-public");
+      let page = await getPublicLanding(db.pool, "album-public", TODAY);
+      assert.deepEqual([page?.photos, page?.contacts], [[], []]);
+      await saveLandingAlbum(db.pool, b.owner, b.project.id, [
+        { url: "https://img.example/2.jpg", caption: "Segunda" },
+        { url: "https://img.example/1.jpg", caption: null },
+      ]);
+      await saveLandingContacts(db.pool, b.owner, b.project.id, [
+        { platform: "email", label: null, value: "band@example.com" },
+        { platform: "other", label: "Telegram", value: "https://t.me/band" },
+      ]);
+      page = await getPublicLanding(db.pool, "album-public", TODAY);
+      assert.deepEqual(page?.photos, [
+        { url: "https://img.example/2.jpg", caption: "Segunda" },
+        { url: "https://img.example/1.jpg", caption: null },
+      ]);
+      assert.deepEqual(page?.contacts, [
+        { platform: "email", label: null, value: "band@example.com" },
+        { platform: "other", label: "Telegram", value: "https://t.me/band" },
+      ]);
+    });
+
+    it("never shows another Banda's album or contacts", async () => {
+      const a = await publicBand("album-mix-a");
+      await publicBand("album-mix-b");
+      await saveLandingAlbum(db.pool, a.owner, a.project.id, [{ url: "https://img.example/a.jpg", caption: null }]);
+      await saveLandingContacts(db.pool, a.owner, a.project.id, [{ platform: "email", label: null, value: "a@example.com" }]);
+      const page = await getPublicLanding(db.pool, "album-mix-b", TODAY);
+      assert.deepEqual([page?.photos, page?.contacts], [[], []]);
     });
 
     it("never mixes in another Banda's content", async () => {

@@ -1,4 +1,4 @@
-import { MapPin } from "lucide-react";
+import { Camera, Globe, Link as LinkIcon, type LucideIcon, Mail, MapPin, MessageCircle, Music, Phone, Play, Users } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -8,7 +8,9 @@ import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { todayIn } from "@/lib/format.ts";
 import { initials } from "@/lib/initials.ts";
-import { getPublicLanding, type PublicAppearance } from "@/services/landing-page.ts";
+import { CONTACT_LABELS } from "@/lib/contact-label.ts";
+import { contactHref, type ContactPlatform } from "@/lib/contact-link.ts";
+import { getPublicLanding, type LandingContact, type PublicAppearance } from "@/services/landing-page.ts";
 
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -20,6 +22,43 @@ export async function generateMetadata({ params }: PageProps<"/[slug]">): Promis
   const { slug } = await params;
   const page = await loadLanding(slug);
   return { title: page ? page.name : "Backstage" };
+}
+
+const CONTACT_ICONS: Record<ContactPlatform, LucideIcon> = {
+  instagram: Camera,
+  facebook: Users,
+  whatsapp: MessageCircle,
+  email: Mail,
+  phone: Phone,
+  tiktok: Music,
+  youtube: Play,
+  spotify: Music,
+  website: Globe,
+  other: LinkIcon,
+};
+
+const CONTACT_PILL =
+  "inline-flex min-h-12 items-center gap-2.5 rounded-pill border border-line-control px-5 text-[15px] text-ink no-underline";
+
+function Contact({ contact }: { contact: LandingContact }) {
+  const Icon = CONTACT_ICONS[contact.platform];
+  const href = contactHref(contact.platform, contact.value);
+  const name = contact.platform === "other" ? contact.label : CONTACT_LABELS[contact.platform];
+  const body = (
+    <>
+      <Icon {...iconProps} className="size-[18px] shrink-0" />
+      <span className="min-w-0 break-words">
+        <span className="text-ink-muted">{name}</span> {contact.value}
+      </span>
+    </>
+  );
+  return href ? (
+    <a href={href} className={`${CONTACT_PILL} hover:bg-bg-3`} rel="noopener noreferrer">
+      {body}
+    </a>
+  ) : (
+    <span className={CONTACT_PILL}>{body}</span>
+  );
 }
 
 function Appearance({ appearance }: { appearance: PublicAppearance }) {
@@ -53,7 +92,7 @@ function Appearance({ appearance }: { appearance: PublicAppearance }) {
 }
 
 // A Banda's public page, for anyone: song titles with intensity and the
-// public Confirmed or Paid Events. Nothing else about the Banda is exposed.
+// public Confirmed or Paid Events, the photo album and contact links. Nothing else about the Banda is exposed.
 export default async function LandingPage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
   const page = await loadLanding(slug);
@@ -108,6 +147,41 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
             <p className="m-0 text-ink-muted">Todavía no hay canciones.</p>
           )}
         </section>
+
+        {page.photos.length > 0 && (
+          <section id="fotos" className="flex flex-col gap-4">
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Fotos</h2>
+            <ul className="m-0 grid list-none grid-cols-3 gap-4 p-0 max-desktop:grid-cols-2 max-sm:grid-cols-1">
+              {page.photos.map((photo, i) => (
+                <li key={`${i}-${photo.url}`} className="m-0 flex flex-col gap-2">
+                  {/* Bands host their photos anywhere: no image optimizer. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt={photo.caption ?? ""}
+                    loading="lazy"
+                    className="aspect-[4/3] w-full rounded-lg border border-line bg-bg-2 object-cover"
+                  />
+                  {photo.caption && <span className="text-[13px]/[18px] text-ink-muted">{photo.caption}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {page.contacts.length > 0 && (
+          <section
+            id="contacto"
+            className="flex flex-col gap-5 rounded-xl border border-line bg-bg-2 p-10 max-sm:p-5"
+          >
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Contratá a {page.name}</h2>
+            <div className="flex flex-wrap gap-3">
+              {page.contacts.map((c, i) => (
+                <Contact key={`${i}-${c.platform}-${c.value}`} contact={c} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <footer className="flex items-center gap-2 text-[13px] text-ink-muted">
           <DoorMark className="h-[18px]" />
