@@ -52,6 +52,14 @@ describe("Landing page", () => {
       });
     });
 
+    it("turns a live page off when saved with the switch off and a blank address", async () => {
+      const b = await band("blank-off");
+      await saveLandingSettings(db.pool, b.owner, b.project.id, { enabled: true, slug: "blank-off" });
+      const saved = await saveLandingSettings(db.pool, b.owner, b.project.id, { enabled: false, slug: "" });
+      assert.deepEqual(saved, { enabled: false, slug: "blank-off" });
+      assert.equal(await getPublicLanding(db.pool, "blank-off", "2026-10-02"), null);
+    });
+
     it("rejects malformed addresses", async () => {
       const b = await band("malformed");
       for (const slug of ["ab", "has space", "-lead", "trail-", "dos--guiones", "ñandú", "a/b", "x".repeat(41)]) {

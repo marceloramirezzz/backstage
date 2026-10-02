@@ -42,7 +42,12 @@ export async function saveLandingSettings(
   const slug = (input.slug ?? "").trim().toLowerCase();
   if (!slug) {
     if (input.enabled) throw new ServiceError("invalid_input", "Choose an address before turning the page on");
-    return { enabled: false, slug: (await getLandingSettings(pool, user, projectId)).slug };
+    // Nothing to publish at: switch off whatever was live, keep its address.
+    const { rows } = await pool.query<LandingSettings>(
+      "UPDATE landing_pages SET enabled = false, updated_at = now() WHERE project_id = $1 RETURNING enabled, slug",
+      [projectId],
+    );
+    return rows[0] ?? { enabled: false, slug: null };
   }
   if (RESERVED_SLUGS.has(slug)) throw new ServiceError("slug_reserved", "That address is reserved");
   if (slug.length < MIN_SLUG_LENGTH || slug.length > MAX_SLUG_LENGTH || !SLUG_PATTERN.test(slug)) {
