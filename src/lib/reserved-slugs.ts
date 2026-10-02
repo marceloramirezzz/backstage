@@ -8,6 +8,8 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "ingresar",
   "invitacion",
   "verificar",
+  "recuperar",
+  "restablecer",
   "api",
   "brand",
   "favicon",
