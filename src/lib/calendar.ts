@@ -76,3 +76,11 @@ export function formatLongDate(date: string): string {
       .replace(",", ""),
   );
 }
+
+// The inclusive `YYYY-MM-DD` bounds of the month, or of its whole year.
+export function periodRange(month: string, byYear: boolean): { from: string; to: string } {
+  const year = month.slice(0, 4);
+  if (byYear) return { from: `${year}-01-01`, to: `${year}-12-31` };
+  const last = new Date(Date.UTC(+year, +month.slice(5), 0)).getUTCDate();
+  return { from: `${month}-01`, to: `${month}-${pad(last)}` };
+}

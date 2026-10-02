@@ -5,7 +5,7 @@ import { SplitEditor } from "@/app/p/[projectId]/split-editor.tsx";
 import { Avatar } from "@/components/ui/brand.tsx";
 import { buttonClass } from "@/components/ui/button.tsx";
 import { getPool } from "@/db/pool.ts";
-import { addMonths, formatMonthTitle, parseMonth } from "@/lib/calendar.ts";
+import { addMonths, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
 import { DEFAULT_TIME_ZONE, formatGuaranies } from "@/lib/format.ts";
 import { initials } from "@/lib/initials.ts";
 import { roleLabel } from "@/lib/role-label.ts";
@@ -43,7 +43,7 @@ export default async function PayoutsPage({
   const month = parseMonth(first(query.mes), todayIn().slice(0, 7));
   const byYear = first(query.periodo) === "anio";
   const year = month.slice(0, 4);
-  const period = byYear ? { from: `${year}-01-01`, to: `${year}-12-31` } : { from: `${month}-01`, to: `${month}-${new Date(Date.UTC(+year, +month.slice(5), 0)).getUTCDate()}` };
+  const period = periodRange(month, byYear);
   const [split, totals] = await Promise.all([
     getDefaultSplit(pool, user, projectId),
     listPersonTotals(pool, user, projectId, period),

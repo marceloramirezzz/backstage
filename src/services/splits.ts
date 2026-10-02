@@ -190,7 +190,7 @@ export async function listPersonTotals(
   return members;
 }
 
-const isDay = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+export const isDay = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 // Rules must be well-formed, one per Role of this Project, with percentages
 // adding up to exactly 100% whenever there are any.
