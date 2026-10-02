@@ -3,6 +3,7 @@ import type { User } from "./accounts.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
 import { getPermissions, type Permissions } from "./permissions.ts";
+import { dropSnapshot, takeSnapshot } from "./payout-snapshots.ts";
 import type { Intensity, Song } from "./songs.ts";
 import { inTransaction } from "./transaction.ts";
 
@@ -131,6 +132,7 @@ export async function createEvent(
       [projectId, ...Object.values(fields)],
     );
     if (setlistId) await copySetlist(client, projectId, rows[0].id, setlistId);
+    if (fields.status === "paid") await takeSnapshot(client, projectId, rows[0].id);
     return findEvent(client, projectId, rows[0].id, permissions);
   });
 }
@@ -148,6 +150,10 @@ export async function updateEvent(
   if (!isUuid(eventId)) throw new ServiceError("not_found", "Event not found");
   return inTransaction(pool, async (client) => {
     const columns = Object.keys(fields);
+    const { rows: before } = await client.query<{ status: EventStatus; pay: string }>(
+      "SELECT status, pay FROM events WHERE id = $1 AND project_id = $2 FOR UPDATE",
+      [eventId, projectId],
+    );
     const { rowCount } = await client.query(
       `UPDATE events SET updated_at = now()${columns.map((c, i) => `, ${c} = $${i + 3}`).join("")}
        WHERE id = $1 AND project_id = $2`,
@@ -156,6 +162,13 @@ export async function updateEvent(
     if (!rowCount) throw new ServiceError("not_found", "Event not found");
     if (setlistId) await copySetlist(client, projectId, eventId, setlistId);
     if (setlistId === null) await clearSetlist(client, eventId);
+    // Paid freezes the payout; leaving Paid unfreezes it. Other edits to a Paid
+    // Event leave the snapshot alone, only its pay re-freezes it.
+    const paid = (fields.status ?? before[0].status) === "paid";
+    if (!paid) await dropSnapshot(client, eventId);
+    else if (before[0].status !== "paid" || (fields.pay !== undefined && String(fields.pay) !== before[0].pay)) {
+      await takeSnapshot(client, projectId, eventId);
+    }
     return findEvent(client, projectId, eventId, permissions);
   });
 }

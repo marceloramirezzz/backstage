@@ -213,16 +213,19 @@ describe("payout splits", () => {
     assert.deepEqual(await getEventPayout(db.pool, b.lucia, b.project.id, b.event.id), {
       scope: "own",
       amount: 1_068_750,
+      frozenAt: null,
     });
     // A Role that can't see pay still gets their own share, and nothing else.
     assert.deepEqual(await getEventPayout(db.pool, b.sofia, b.project.id, b.event.id), {
       scope: "own",
       amount: 300_000,
+      frozenAt: null,
     });
     await setAttending(db.pool, b.owner, b.project.id, b.event.id, b.rodrigo.id, false);
     assert.deepEqual(await getEventPayout(db.pool, b.rodrigo, b.project.id, b.event.id), {
       scope: "own",
       amount: null,
+      frozenAt: null,
     });
   });
 

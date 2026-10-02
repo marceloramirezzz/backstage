@@ -1,12 +1,28 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { SplitEditor } from "@/app/p/[projectId]/split-editor.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
-import { formatGuaranies } from "@/lib/format.ts";
+import { Tag } from "@/components/ui/tag.tsx";
+import { formatGuaranies, formatShortDate } from "@/lib/format.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { basisPointsToPercent } from "@/lib/split-form.ts";
 import type { EventPayout, SplitRole, SplitRule } from "@/services/splits.ts";
 import { UseDefaultSplitButton } from "./use-default-split.tsx";
+
+// Says the Reparto is a snapshot: a Pagado Evento keeps its amounts whatever
+// happens to the band's Roles, Miembros or default Reparto afterwards.
+function FrozenNotice({ frozenAt }: { frozenAt: string }) {
+  return (
+    <p className="m-0 flex items-start gap-2 rounded-md border border-line bg-bg-2 p-3 text-[13px]/[18px] text-ink-muted">
+      <Lock {...iconProps} className="mt-px shrink-0" />
+      <span>
+        Reparto congelado el {formatShortDate(frozenAt)}: como el evento está pagado, los montos no cambian aunque
+        cambien los roles, los miembros o el reparto de la banda. Si lo pasás a otro estado, vuelven a
+        calcularse.
+      </span>
+    </p>
+  );
+}
 
 const Line = ({ label, amount, strong, minus }: { label: ReactNode; amount: number; strong?: boolean; minus?: boolean }) => (
   <div className={`flex justify-between gap-4 ${strong ? "font-semibold" : "text-ink-muted"}`}>
@@ -18,7 +34,7 @@ const Line = ({ label, amount, strong, minus }: { label: ReactNode; amount: numb
   </div>
 );
 
-// The Evento's Reparto, live while it isn't frozen. Admins see the math and
+// The Evento's Reparto: a live preview, or frozen while the Evento is Pagado. Admins see the math and
 // everyone's share and can give the Evento its own split; everyone else sees
 // only their own share.
 export function RepartoSection({
@@ -39,6 +55,7 @@ export function RepartoSection({
         <h2 id="reparto-title" className="m-0 text-heading">
           Reparto
         </h2>
+        {payout.frozenAt && <FrozenNotice frozenAt={payout.frozenAt} />}
         {payout.amount === null ? (
           <p className="m-0 text-[14px]/[20px] text-ink-muted">No figurás en la asistencia de este evento: no te toca parte.</p>
         ) : (
@@ -61,13 +78,16 @@ export function RepartoSection({
   return (
     <section aria-labelledby="reparto-title" className="flex flex-col gap-4 rounded-lg border border-line bg-bg-1 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="reparto-title" className="m-0 text-heading">
+        <h2 id="reparto-title" className="m-0 flex items-center gap-2 text-heading">
           Reparto
+          {payout.frozenAt && <Tag>Congelado</Tag>}
         </h2>
         <span className="text-[13px]/[18px] text-ink-muted">
           {payout.source === "event" ? "Reparto propio de este evento" : "Reparto de la banda"}
         </span>
       </div>
+
+      {payout.frozenAt && <FrozenNotice frozenAt={payout.frozenAt} />}
 
       {result.overAllocated && (
         <p

@@ -3,14 +3,12 @@ import type { User } from "./accounts.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
 import { requireEdit, requireEvent } from "./events.ts";
+import { liveMembers, type AttendanceMember } from "./payout-live.ts";
+import { findSnapshot, syncSnapshot } from "./payout-snapshots.ts";
 import { getPermissions } from "./permissions.ts";
+import { inTransaction } from "./transaction.ts";
 
-export interface AttendanceMember {
-  userId: string;
-  displayName: string;
-  roleName: string;
-  attending: boolean;
-}
+export type { AttendanceMember };
 
 // A name-only person hired for one Event.
 export interface Guest {
@@ -41,23 +39,24 @@ export async function getAttendance(
 ): Promise<Attendance> {
   const permissions = await getPermissions(pool, user, projectId);
   await requireEvent(pool, projectId, eventId);
-  const members = await pool.query<AttendanceMember>(
-    `SELECT u.id AS "userId", u.display_name AS "displayName", r.name AS "roleName",
-       a.user_id IS NULL AS attending
-     FROM memberships m
-     JOIN users u ON u.id = m.user_id
-     JOIN roles r ON r.id = m.role_id
-     LEFT JOIN event_absences a ON a.event_id = $2 AND a.user_id = m.user_id
-     WHERE m.project_id = $1
-     ORDER BY lower(u.display_name), u.id`,
-    [projectId, eventId],
-  );
+  // A Paid Event shows who played as of when it was frozen.
+  const frozen = await findSnapshot(pool, eventId);
+  if (frozen) {
+    return {
+      members: frozen.attendance,
+      guests: frozen.payout.guests.map((g) => ({
+        id: g.id,
+        name: g.name,
+        amount: permissions.seeTotalPayExpenses ? g.fixedAmount : null,
+      })),
+    };
+  }
   const guests = await pool.query<Guest>(
     `SELECT id, name, CASE WHEN $2 THEN amount END::float8 AS amount
      FROM event_guests WHERE event_id = $1 ORDER BY created_at, id`,
     [eventId, permissions.seeTotalPayExpenses],
   );
-  return { members: members.rows, guests: guests.rows };
+  return { members: await liveMembers(pool, projectId, eventId), guests: guests.rows };
 }
 
 // Ticks or unticks a Member. Nobody edits their own, so a Member can't
@@ -83,13 +82,16 @@ export async function setAttending(
       ])
     : { rows: [] };
   if (!rows[0]) throw new ServiceError("not_found", "Member not found");
-  await pool.query(
-    attending
-      ? "DELETE FROM event_absences WHERE event_id = $1 AND user_id = $2"
-      : `INSERT INTO event_absences (event_id, project_id, user_id) VALUES ($1, $3, $2)
-         ON CONFLICT DO NOTHING`,
-    attending ? [eventId, memberUserId] : [eventId, memberUserId, projectId],
-  );
+  await inTransaction(pool, async (client) => {
+    await client.query(
+      attending
+        ? "DELETE FROM event_absences WHERE event_id = $1 AND user_id = $2"
+        : `INSERT INTO event_absences (event_id, project_id, user_id) VALUES ($1, $3, $2)
+           ON CONFLICT DO NOTHING`,
+      attending ? [eventId, memberUserId] : [eventId, memberUserId, projectId],
+    );
+    await syncSnapshot(client, projectId, eventId);
+  });
 }
 
 export async function addGuest(
@@ -112,11 +114,14 @@ export async function addGuest(
     throw new ServiceError("forbidden", "You can't set the amount of a Guest you can't see it of");
   }
   await requireEvent(pool, projectId, eventId);
-  const { rows } = await pool.query<{ id: string }>(
-    "INSERT INTO event_guests (event_id, name, amount) VALUES ($1, $2, $3) RETURNING id",
-    [eventId, name, amount],
-  );
-  return { id: rows[0].id, name, amount: permissions.seeTotalPayExpenses ? amount : null };
+  return inTransaction(pool, async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      "INSERT INTO event_guests (event_id, name, amount) VALUES ($1, $2, $3) RETURNING id",
+      [eventId, name, amount],
+    );
+    await syncSnapshot(client, projectId, eventId);
+    return { id: rows[0].id, name, amount: permissions.seeTotalPayExpenses ? amount : null };
+  });
 }
 
 export async function removeGuest(
@@ -129,8 +134,11 @@ export async function removeGuest(
   const permissions = await getPermissions(pool, user, projectId);
   requireEdit(permissions);
   await requireEvent(pool, projectId, eventId);
-  const { rowCount } = isUuid(guestId)
-    ? await pool.query("DELETE FROM event_guests WHERE id = $1 AND event_id = $2", [guestId, eventId])
-    : { rowCount: 0 };
-  if (!rowCount) throw new ServiceError("not_found", "Guest not found");
+  await inTransaction(pool, async (client) => {
+    const { rowCount } = isUuid(guestId)
+      ? await client.query("DELETE FROM event_guests WHERE id = $1 AND event_id = $2", [guestId, eventId])
+      : { rowCount: 0 };
+    if (!rowCount) throw new ServiceError("not_found", "Guest not found");
+    await syncSnapshot(client, projectId, eventId);
+  });
 }
