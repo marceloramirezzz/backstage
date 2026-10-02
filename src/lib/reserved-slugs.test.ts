@@ -6,7 +6,8 @@ import { RESERVED_SLUGS } from "./reserved-slugs.ts";
 describe("RESERVED_SLUGS", () => {
   it("covers every top-level route folder and public file", () => {
     const routes = readdirSync("src/app", { withFileTypes: true })
-      .filter((e) => e.isDirectory())
+      // A dynamic segment, like the Landing page's own [slug], is not a fixed path.
+      .filter((e) => e.isDirectory() && !e.name.startsWith("["))
       .map((e) => e.name.replace(/^\(.*\)$/, ""))
       .filter(Boolean);
     const publicEntries = readdirSync("public").map((n) => n.replace(/\..*$/, ""));
