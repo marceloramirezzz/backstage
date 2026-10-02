@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buttonClass } from "@/components/ui/button.tsx";
 import { getPool } from "@/db/pool.ts";
+import { requestOrigin } from "@/lib/origin.ts";
 import { requireUser } from "@/lib/session.ts";
 import { getLandingSettings } from "@/services/landing-page.ts";
 import { getPermissions } from "@/services/permissions.ts";
@@ -20,8 +20,7 @@ export default async function PublicPageSettings({
   const pool = getPool();
   if (!(await getPermissions(pool, user, projectId)).administer) notFound();
   const settings = await getLandingSettings(pool, user, projectId);
-  const host = (await headers()).get("host") ?? "";
-  const origin = host ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : "";
+  const origin = await requestOrigin();
 
   return (
     <main className="flex min-w-0 flex-col gap-6 p-6 max-desktop:px-4">

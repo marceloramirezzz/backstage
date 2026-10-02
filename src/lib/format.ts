@@ -3,6 +3,10 @@
 // Where the bands play; times are shown on this clock.
 export const DEFAULT_TIME_ZONE = "America/Asuncion";
 
+// The band's current day as YYYY-MM-DD.
+export const todayIn = (timeZone = DEFAULT_TIME_ZONE) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+
 // Dot thousands, written out by hand: Spanish locales in Intl skip grouping
 // for four-digit numbers ("4500"), and the UI always groups.
 const groupThousands = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");

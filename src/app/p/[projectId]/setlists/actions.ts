@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPool } from "@/db/pool.ts";
+import { errorMessage, type ErrorMessages } from "@/lib/error-message.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import {
@@ -24,20 +25,11 @@ export interface SetlistFormState extends SetlistActionState {
   saved: number;
 }
 
-type ErrorMessages = Partial<Record<ServiceError["code"], string>>;
-
 const FORBIDDEN: ErrorMessages = { forbidden: "Tu rol no puede editar setlists." };
 const GONE: ErrorMessages = { not_found: "Esta setlist ya no existe." };
 
 const setlistsPath = (projectId: string, setlistId?: string) =>
   `/p/${projectId}/setlists${setlistId ? `?setlist=${setlistId}` : ""}`;
-
-// The message for a failed call, or a rethrow when it isn't expected.
-function errorMessage(err: unknown, messages: ErrorMessages): string {
-  const error = err instanceof ServiceError && messages[err.code];
-  if (error) return error;
-  throw err;
-}
 
 // Adds an empty Setlist and opens it.
 export async function addSetlist(

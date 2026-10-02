@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getPool } from "@/db/pool.ts";
 import { addMonths, formatMonthTitle, monthGrid, parseMonth } from "@/lib/calendar.ts";
 import { STATUS_LABELS } from "@/lib/event-status.ts";
-import { DEFAULT_TIME_ZONE } from "@/lib/format.ts";
+import { todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
 import { EVENT_STATUSES, listEvents } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
@@ -15,7 +15,6 @@ export const metadata: Metadata = { title: "Calendario · Backstage" };
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
 // Today on the bands' clock, as `YYYY-MM-DD`.
-const todayIn = () => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TIME_ZONE }).format(new Date());
 
 // The Banda's home: a month of Eventos, as a grid or, under 640px, an agenda.
 // Every Member sees them; Members who can edit events also add, edit and

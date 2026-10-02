@@ -1,49 +1,53 @@
 import { MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { DoorMark } from "@/components/ui/brand.tsx";
 import { IntensityMeter } from "@/components/ui/intensity-meter.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
-import { DEFAULT_TIME_ZONE } from "@/lib/format.ts";
+import { todayIn } from "@/lib/format.ts";
 import { initials } from "@/lib/initials.ts";
 import { getPublicLanding, type PublicAppearance } from "@/services/landing-page.ts";
 
-const todayIn = () => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TIME_ZONE }).format(new Date());
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
+// One query per request, shared by the metadata and the page.
+const loadLanding = cache((slug: string) => getPublicLanding(getPool(), slug, todayIn()));
+
 export async function generateMetadata({ params }: PageProps<"/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const page = await getPublicLanding(getPool(), slug, todayIn());
+  const page = await loadLanding(slug);
   return { title: page ? page.name : "Backstage" };
 }
 
-function Appearance({ a }: { a: PublicAppearance }) {
-  const [, month, day] = a.date.split("-");
+function Appearance({ appearance }: { appearance: PublicAppearance }) {
+  const { upcoming, date, name, location, startTime } = appearance;
+  const [, month, day] = date.split("-");
   return (
     <li
-      className={`grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-5 border-t border-line py-4 max-sm:gap-3 ${a.upcoming ? "" : "text-ink-muted"}`}
+      className={`grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-5 border-t border-line py-4 max-sm:gap-3 ${upcoming ? "" : "text-ink-muted"}`}
     >
       <span className="flex flex-col font-mono">
-        <span className={`text-[28px]/[32px] font-medium ${a.upcoming ? "text-spotlight-ink" : ""}`}>{day}</span>
+        <span className={`text-[28px]/[32px] font-medium ${upcoming ? "text-spotlight-ink" : ""}`}>{day}</span>
         <span className="text-[12px] uppercase">{MONTHS[Number(month) - 1]}</span>
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className={`text-[18px]/[24px] font-medium ${a.upcoming ? "text-ink" : ""}`}>{a.name}</span>
-        {(a.location || a.startTime) && (
+        <span className={`text-[18px]/[24px] font-medium ${upcoming ? "text-ink" : ""}`}>{name}</span>
+        {(location || startTime) && (
           <span className="flex flex-wrap items-center gap-x-3 text-[14px]/[20px] text-ink-muted">
-            {a.location && (
+            {location && (
               <span className="flex items-center gap-1">
                 <MapPin {...iconProps} className="size-3.5" aria-hidden />
-                {a.location}
+                {location}
               </span>
             )}
-            {a.startTime && <span className="font-mono">{a.startTime}</span>}
+            {startTime && <span className="font-mono">{startTime}</span>}
           </span>
         )}
       </span>
-      <span className="text-[12px] uppercase tracking-[.06em]">{a.upcoming ? "Próximo" : "Tocado"}</span>
+      <span className="text-[12px] uppercase tracking-[.06em]">{upcoming ? "Próximo" : "Tocado"}</span>
     </li>
   );
 }
@@ -52,7 +56,7 @@ function Appearance({ a }: { a: PublicAppearance }) {
 // public Confirmed or Paid Events. Nothing else about the Banda is exposed.
 export default async function LandingPage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
-  const page = await getPublicLanding(getPool(), slug, todayIn());
+  const page = await loadLanding(slug);
   if (!page) notFound();
 
   return (
@@ -78,7 +82,7 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
           {page.appearances.length ? (
             <ul className="m-0 flex list-none flex-col border-b border-line p-0">
               {page.appearances.map((a) => (
-                <Appearance key={`${a.date}-${a.name}-${a.startTime}`} a={a} />
+                <Appearance key={`${a.date}-${a.name}-${a.startTime}`} appearance={a} />
               ))}
             </ul>
           ) : (
@@ -90,13 +94,13 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
           <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Repertorio</h2>
           {page.repertoire.length ? (
             <ul className="m-0 list-none p-0 columns-2 gap-12 max-sm:columns-1">
-              {page.repertoire.map((r, i) => (
+              {page.repertoire.map((item, i) => (
                 <li
-                  key={`${i}-${r.name}`}
+                  key={`${i}-${item.name}`}
                   className="flex break-inside-avoid items-center justify-between gap-3 border-b border-line py-2.5 text-[15px]"
                 >
-                  {r.name}
-                  <IntensityMeter intensity={r.intensity} />
+                  {item.name}
+                  <IntensityMeter intensity={item.intensity} />
                 </li>
               ))}
             </ul>
