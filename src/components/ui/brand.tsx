@@ -8,12 +8,12 @@ export function DoorMark({ className = "h-7" }: { className?: string }) {
       <img
         src="/brand/backstage-door-white.png"
         alt=""
-        className={`block w-auto in-data-[theme=light]:hidden ${className}`}
+        className={`block w-auto light:hidden ${className}`}
       />
       <img
         src="/brand/backstage-door-black.png"
         alt=""
-        className={`hidden w-auto in-data-[theme=light]:block ${className}`}
+        className={`hidden w-auto light:block ${className}`}
       />
     </>
   );

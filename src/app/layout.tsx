@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getCurrentUser } from "@/lib/session.ts";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,12 +18,14 @@ export const metadata: Metadata = {
   description: "Los eventos, setlists y repartos de tu banda en un solo lugar.",
 };
 
-// Dark until Users can choose a theme.
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// The theme is rendered here, so the first paint is already right. Signed-out
+// pages follow the OS.
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = (await getCurrentUser())?.theme ?? "system";
   return (
     <html
       lang="es"
-      data-theme="dark"
+      data-theme={theme}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>

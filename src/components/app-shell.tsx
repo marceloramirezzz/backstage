@@ -11,10 +11,12 @@ import { TopBar } from "@/components/ui/top-bar.tsx";
 export function AppShell({
   sidebar,
   topBar,
+  topBarEnd,
   children,
 }: {
   sidebar: ReactNode;
   topBar: ReactNode;
+  topBarEnd?: ReactNode;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -65,7 +67,7 @@ export function AppShell({
         )}
       </div>
       <div className="flex min-w-0 flex-col">
-        <TopBar>
+        <TopBar end={topBarEnd}>
           <IconButton
             ref={menuButton}
             aria-label="Abrir menú"

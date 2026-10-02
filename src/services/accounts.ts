@@ -10,7 +10,12 @@ export interface User {
   email: string;
   displayName: string;
   emailVerified: boolean;
+  theme: Theme;
+  hasPassword: boolean;
 }
+
+export const THEMES = ["dark", "light", "system"] as const;
+export type Theme = (typeof THEMES)[number];
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -30,7 +35,8 @@ const RESET_TTL_MS = RESET_TTL_HOURS * 60 * 60 * 1000;
 const resetExpiry = (now: Date) => new Date(now.getTime() + RESET_TTL_MS);
 
 const USER_COLUMNS = `id, email, display_name AS "displayName",
-  email_verified_at IS NOT NULL AS "emailVerified"`;
+  email_verified_at IS NOT NULL AS "emailVerified", theme,
+  password_hash IS NOT NULL AS "hasPassword"`;
 
 // Stored as "scrypt:<salt>:<hash>", both base64.
 async function hashPassword(password: string): Promise<string> {
@@ -390,9 +396,24 @@ export async function addPassword(
   user: User,
   input: { password: string },
 ): Promise<void> {
+  if (input.password.length < MIN_PASSWORD_LENGTH) {
+    throw new ServiceError("invalid_input", `Password must have at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
   const { rowCount } = await pool.query(
     "UPDATE users SET password_hash = $2 WHERE id = $1 AND password_hash IS NULL",
     [user.id, await hashPassword(input.password)],
   );
   if (!rowCount) throw new ServiceError("password_already_set", "This account already has a password");
+}
+
+export async function setDisplayName(pool: Pool, user: User, displayName: string): Promise<void> {
+  const name = displayName.trim();
+  if (!name) throw new ServiceError("invalid_input", "Display name is required");
+  await pool.query("UPDATE users SET display_name = $2 WHERE id = $1", [user.id, name]);
+}
+
+// `system` follows the device's light/dark setting.
+export async function setTheme(pool: Pool, user: User, theme: Theme): Promise<void> {
+  if (!THEMES.includes(theme)) throw new ServiceError("invalid_input", "Theme is not valid");
+  await pool.query("UPDATE users SET theme = $2 WHERE id = $1", [user.id, theme]);
 }
