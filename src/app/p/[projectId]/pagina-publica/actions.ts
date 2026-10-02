@@ -3,8 +3,8 @@
 import { refresh } from "next/cache";
 import { getPool } from "@/db/pool.ts";
 import { text } from "@/lib/form.ts";
+import { errorMessage, type ErrorMessages } from "@/lib/error-message.ts";
 import { requireUser } from "@/lib/session.ts";
-import { ServiceError } from "@/services/errors.ts";
 import { saveLandingSettings } from "@/services/landing-page.ts";
 
 export interface LandingActionState {
@@ -14,7 +14,7 @@ export interface LandingActionState {
   done: number;
 }
 
-const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
+const MESSAGES: ErrorMessages = {
   forbidden: "Solo los admins editan la página pública.",
   not_found: "Esta banda ya no existe.",
   invalid_input: "Elegí una dirección de 3 a 40 letras minúsculas, números y guiones simples.",
@@ -33,8 +33,6 @@ export async function saveLanding(prev: LandingActionState, form: FormData): Pro
     refresh();
     return { slug: saved.slug ?? "", done: prev.done + 1 };
   } catch (err) {
-    const message = err instanceof ServiceError && MESSAGES[err.code];
-    if (message) return { ...prev, slug, error: message };
-    throw err;
+    return { ...prev, slug, error: errorMessage(err, MESSAGES) };
   }
 }

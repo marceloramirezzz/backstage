@@ -60,7 +60,7 @@ export async function saveLandingSettings(
     await pool.query(
       `INSERT INTO landing_pages (project_id, slug, enabled) VALUES ($1, $2, $3)
        ON CONFLICT (project_id) DO UPDATE SET slug = $2, enabled = $3, updated_at = now()`,
-      [projectId, slug, Boolean(input.enabled)],
+      [projectId, slug, input.enabled],
     );
   } catch (err) {
     if (isViolation(err, UNIQUE_VIOLATION, "landing_pages_slug_unique")) {
@@ -68,7 +68,7 @@ export async function saveLandingSettings(
     }
     throw err;
   }
-  return { enabled: Boolean(input.enabled), slug };
+  return { enabled: input.enabled, slug };
 }
 
 export interface PublicAppearance {

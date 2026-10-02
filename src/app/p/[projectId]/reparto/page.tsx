@@ -6,7 +6,7 @@ import { Avatar } from "@/components/ui/brand.tsx";
 import { buttonClass } from "@/components/ui/button.tsx";
 import { getPool } from "@/db/pool.ts";
 import { addMonths, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
-import { DEFAULT_TIME_ZONE, formatGuaranies } from "@/lib/format.ts";
+import { formatGuaranies, todayIn } from "@/lib/format.ts";
 import { initials } from "@/lib/initials.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { requireUser } from "@/lib/session.ts";
@@ -16,7 +16,6 @@ import { getDefaultSplit, listPersonTotals } from "@/services/splits.ts";
 export const metadata: Metadata = { title: "Reparto · Backstage" };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-const todayIn = () => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TIME_ZONE }).format(new Date());
 
 const Card = ({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) => (
   <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-bg-2 p-4">

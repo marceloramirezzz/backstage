@@ -6,14 +6,13 @@ import { StatTile } from "@/components/ui/stat-tile.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { addMonths, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
-import { DEFAULT_TIME_ZONE, formatGuaraniesCompact } from "@/lib/format.ts";
+import { formatGuaraniesCompact, todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
 import { getDashboard } from "@/services/dashboard.ts";
 
 export const metadata: Metadata = { title: "Resumen · Backstage" };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-const todayIn = () => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TIME_ZONE }).format(new Date());
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 

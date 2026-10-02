@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPool } from "@/db/pool.ts";
 import { text, whole } from "@/lib/form.ts";
+import { errorMessage } from "@/lib/error-message.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import {
@@ -21,17 +22,8 @@ export interface EventFormState {
   saved: number;
 }
 
-type ErrorMessages = Partial<Record<ServiceError["code"], string>>;
-
 const FORBIDDEN = "Tu rol no puede editar eventos.";
 const GONE = "Este evento ya no existe.";
-
-// The message for a failed call, or a rethrow when it isn't expected.
-function errorMessage(err: unknown, messages: ErrorMessages): string {
-  const error = err instanceof ServiceError && messages[err.code];
-  if (error) return error;
-  throw err;
-}
 
 // Adds an Evento and opens it, or edits one when the form carries its id.
 // `setlistId` is a template's id; on an edit, `keep` leaves the copy as is and
