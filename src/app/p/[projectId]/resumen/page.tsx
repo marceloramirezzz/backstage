@@ -5,18 +5,23 @@ import { buttonClass } from "@/components/ui/button.tsx";
 import { StatTile } from "@/components/ui/stat-tile.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
-import { addMonths, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
+import { addMonths, eventTimeRange, formatLongDate, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
 import { formatGuaraniesCompact, todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
+import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { getDashboard } from "@/services/dashboard.ts";
+import { listEvents } from "@/services/events.ts";
 
-export const metadata: Metadata = { title: "Resumen · Backstage" };
+export const metadata: Metadata = { title: "Inicio · Backstage" };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
+const UPCOMING_LIMIT = 5;
+
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-// Shows, Cobrado and Por cobrar for a month or a year. A Rol that can't see
+// Shows, Cobrado and Por cobrar for a month or a year, then the next Eventos
+// whatever the period. A Rol that can't see
 // the total pay gets only its own amounts.
 export default async function DashboardPage({
   params,
@@ -31,14 +36,20 @@ export default async function DashboardPage({
   const step = byYear ? 12 : 1;
   const href = (m: string, periodo = byYear ? "anio" : "mes") => `/p/${projectId}/resumen?periodo=${periodo}&mes=${m}`;
 
-  const dashboard = await getDashboard(getPool(), user, projectId, periodRange(month, byYear));
+  const pool = getPool();
+  const today = todayIn();
+  const [dashboard, ahead] = await Promise.all([
+    getDashboard(pool, user, projectId, periodRange(month, byYear)),
+    listEvents(pool, user, projectId, { from: today }),
+  ]);
+  const upcoming = ahead.filter((e) => e.status !== "cancelled").slice(0, UPCOMING_LIMIT);
   const own = dashboard.scope === "own";
 
   return (
     <main className="flex min-w-0 flex-col gap-6 p-6 max-desktop:px-4">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="m-0 text-display">Resumen</h1>
+          <h1 className="m-0 text-display">Inicio</h1>
           <p className="m-0 text-[14px]/[20px] text-ink-muted">
             {own
               ? "Tu parte de los eventos pagados y de los confirmados que todavía no se pagaron."
@@ -83,6 +94,36 @@ export default async function DashboardPage({
           foot={own ? "Tu parte" : `${plural(dashboard.confirmedShows, "confirmado", "confirmados")}, esperando el pago`}
         />
       </div>
+
+      <section aria-labelledby="proximos" className="flex flex-col gap-3">
+        <h2 id="proximos" className="m-0 text-[16px]/[24px] font-medium">
+          Próximos eventos
+        </h2>
+        {upcoming.length === 0 ? (
+          <p className="m-0 text-[14px]/[20px] text-ink-muted">No hay eventos próximos.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {upcoming.map((e) => (
+              <li key={e.id}>
+                <Link
+                  href={`/p/${projectId}/eventos/${e.id}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-bg-2 px-4 py-3 hover:border-ink-muted"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-[14px]/[20px] font-medium">{e.name}</span>
+                    <span className="text-[12px]/[16px] text-ink-muted">
+                      {formatLongDate(e.date)}
+                      {e.startTime && ` · ${eventTimeRange(e.startTime, e.durationMinutes)}`}
+                      {e.location && ` · ${e.location}`}
+                    </span>
+                  </span>
+                  <StatusLabel status={e.status} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }

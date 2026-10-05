@@ -96,6 +96,7 @@ describe("createSong", () => {
   const invalid: [string, Partial<Record<keyof SongInput, unknown>>][] = [
     ["a blank name", { name: "   " }],
     ["an intensity outside calm, medium, danceable, energetic", { intensity: "loud" }],
+    ["a key outside the listed notes", { key: "La menor" }],
     ["a zero duration", { durationSeconds: 0 }],
     ["a fractional duration", { durationSeconds: 3.5 }],
     ["a missing duration", { durationSeconds: undefined }],

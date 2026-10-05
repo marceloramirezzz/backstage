@@ -19,8 +19,8 @@ export interface ComboboxGroup {
 
 // A dashed "add" field that searches its options as you type (ignoring case
 // and accents) and hands the chosen one to `onSelect`, then empties itself
-// for the next pick. Arrows move through the options, Enter picks, Escape
-// closes the list.
+// for the next pick. Arrows move through the options, Enter or Tab (once
+// something is typed) picks, Escape closes the list.
 export function Combobox({
   groups,
   placeholder,
@@ -69,6 +69,9 @@ export function Combobox({
       moveTo((current + step + options.length) % options.length);
     } else if (e.key === "Enter" && open && options[current]) {
       e.preventDefault(); // not the surrounding form's submit
+      pick(options[current]);
+    } else if (e.key === "Tab" && !e.shiftKey && open && query && options[current]) {
+      e.preventDefault(); // completes the highlighted option; focus stays for the next pick
       pick(options[current]);
     } else if (e.key === "Escape" && open) {
       e.preventDefault(); // not a surrounding dialog's close

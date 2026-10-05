@@ -1,8 +1,8 @@
 import {
   Calendar,
-  ChartLine,
   DollarSign,
   Globe,
+  House,
   ListMusic,
   LogOut,
   Music,
@@ -29,7 +29,7 @@ import { HOME_SECTION, SECTIONS, type SectionPath } from "./sections.ts";
 
 const ICONS: Record<SectionPath, ReactNode> = {
   calendario: <Calendar {...iconProps} />,
-  resumen: <ChartLine {...iconProps} />,
+  resumen: <House {...iconProps} />,
   repertorio: <Music {...iconProps} />,
   setlists: <ListMusic {...iconProps} />,
   reparto: <DollarSign {...iconProps} />,

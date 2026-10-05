@@ -7,6 +7,10 @@ import { getPermissions, requirePermission } from "./permissions.ts";
 export const INTENSITIES = ["calm", "medium", "danceable", "energetic"] as const;
 export type Intensity = (typeof INTENSITIES)[number];
 
+// Every Tono a Song can have: the 12 notes, major then minor.
+export const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+export const SONG_KEYS = [...NOTES, ...NOTES.map((note) => `${note}m`)];
+
 export interface Song {
   id: string;
   name: string;
@@ -122,6 +126,9 @@ function validSongInput(input: SongInput): SongInput {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name) throw new ServiceError("invalid_input", "Song name is required");
   const key = typeof input.key === "string" && input.key.trim() ? input.key.trim() : null;
+  if (key !== null && !SONG_KEYS.includes(key)) {
+    throw new ServiceError("invalid_input", "Song key must be one of the listed notes");
+  }
   const { durationSeconds, intensity } = input;
   if (
     !Number.isInteger(durationSeconds) ||

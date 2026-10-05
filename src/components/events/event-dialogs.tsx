@@ -81,7 +81,7 @@ function EventForm({
     if (state.saved) onSaved();
   }, [state.saved]);
 
-  const minutes = event?.durationMinutes ?? 180;
+  const minutes = event?.durationMinutes ?? 60;
   const copied = event?.setlist;
   return (
     <form onSubmit={submitKeepingFields(action)} className="flex flex-col gap-4">
