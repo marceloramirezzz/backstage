@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { IntensityMeter } from "@/components/ui/intensity-meter.tsx";
-import { Tag } from "@/components/ui/tag.tsx";
 import { getPool } from "@/db/pool.ts";
 import { formatClock } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
@@ -42,10 +41,8 @@ export default async function RepertoirePage({
     filtered ? listSongs(pool, user, projectId, filter) : null,
     filtered ? listSelections(pool, user, projectId, filter) : null,
   ]);
-  const rows = repertoireRows(
-    type === "enganchados" ? [] : (songs ?? allSongs),
-    type === "canciones" ? [] : (selections ?? allSelections),
-  );
+  const songRows = type === "enganchados" ? [] : (songs ?? allSongs);
+  const selectionRows = type === "canciones" ? [] : (selections ?? allSelections);
   const canEdit = permissions.editRepertoireSetlistsEvents;
   const empty = allSongs.length + allSelections.length === 0;
 
@@ -68,10 +65,11 @@ export default async function RepertoirePage({
         )}
       </div>
       {!empty && <RepertoireFilters type={type} search={search} intensity={intensity ?? ""} />}
-      {rows.length > 0 ? (
+      {songRows.length + selectionRows.length > 0 ? (
         <RepertoireList
           projectId={projectId}
-          rows={rows}
+          songRows={songRows}
+          selectionRows={selectionRows}
           songs={allSongs}
           usage={selectionsPerSong(allSelections)}
           canEdit={canEdit}
@@ -86,16 +84,6 @@ export default async function RepertoirePage({
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 type Row = { kind: "song"; item: Song } | { kind: "selection"; item: Selection };
-
-const byTitle = new Intl.Collator("es", { sensitivity: "base", numeric: true });
-
-// Canciones and Enganchados in one list, by title.
-function repertoireRows(songs: Song[], selections: Selection[]): Row[] {
-  return [
-    ...songs.map((item): Row => ({ kind: "song", item })),
-    ...selections.map((item): Row => ({ kind: "selection", item })),
-  ].sort((a, b) => byTitle.compare(a.item.name, b.item.name));
-}
 
 // How many Enganchados each Canción is in, by Song id.
 function selectionsPerSong(selections: Selection[]): Map<string, number> {
@@ -117,97 +105,42 @@ const songOrder = (selection: Selection) => selection.songs.map((s) => s.name).j
 const th = "px-4 py-2.5 text-left text-[12px]/[16px] font-medium whitespace-nowrap text-ink-muted";
 const td = "border-t border-line px-4 py-3 align-middle text-[14px]/[20px]";
 
-// A table from 640px up, stacked cards below.
+// Canciones and Enganchados each in their own section, titled when both show.
 function RepertoireList({
   projectId,
-  rows,
+  songRows,
+  selectionRows,
   songs,
   usage,
   canEdit,
 }: {
   projectId: string;
-  rows: Row[];
+  songRows: Song[];
+  selectionRows: Selection[];
   // Every Canción, for building Enganchados.
   songs: Song[];
   usage: Map<string, number>;
   canEdit: boolean;
 }) {
-  const menu = (row: Row) =>
-    row.kind === "song" ? <SongMenu song={row.item} /> : <SelectionMenu selection={row.item} />;
+  const both = songRows.length > 0 && selectionRows.length > 0;
   const list = (
-    <div className="rounded-lg border border-line bg-bg-2">
-      <table className="w-full border-collapse max-sm:hidden">
-        <thead>
-          <tr>
-            <th className={th}>Título</th>
-            <th className={th}>Tipo</th>
-            <th className={th}>Tono</th>
-            <th className={th}>Duración</th>
-            <th className={th}>Intensidad</th>
-            <th className={th}>Usado en</th>
-            {canEdit && (
-              <th className={th}>
-                <span className="sr-only">Acciones</span>
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.item.id}>
-              <td className={td}>
-                <span className="font-medium">{row.item.name}</span>
-                {row.kind === "selection" && (
-                  <span className="block text-[12px]/[16px] text-ink-muted">
-                    {songOrder(row.item)}
-                  </span>
-                )}
-              </td>
-              <td className={td}>
-                <RowType row={row} />
-              </td>
-              <td className={`${td} font-mono text-num`}>
-                {row.kind === "song" ? (row.item.key ?? "—") : "—"}
-              </td>
-              <td className={`${td} font-mono text-num`}>{formatClock(row.item.durationSeconds)}</td>
-              <td className={td}>
-                <IntensityMeter intensity={row.item.intensity} />
-              </td>
-              <td className={`${td} text-[13px]/[18px] whitespace-nowrap text-ink-muted`}>
-                {usedIn(row, usage)}
-              </td>
-              {canEdit && <td className={`${td} text-right`}>{menu(row)}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <ul className="m-0 hidden list-none p-0 max-sm:block">
-        {rows.map((row) => {
-          const used = usedIn(row, usage);
-          return (
-            <li key={row.item.id} className="flex items-start gap-3 border-line p-4 not-first:border-t">
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="flex flex-col">
-                  <span className="flex flex-wrap items-center gap-2 text-[14px]/[20px] font-medium">
-                    {row.item.name}
-                    {row.kind === "selection" && <RowType row={row} />}
-                  </span>
-                  {row.kind === "selection" && (
-                    <span className="text-[12px]/[16px] text-ink-muted">{songOrder(row.item)}</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  {row.kind === "song" && <Fact label="Tono">{row.item.key ?? "—"}</Fact>}
-                  <Fact label="Duración">{formatClock(row.item.durationSeconds)}</Fact>
-                  <IntensityMeter intensity={row.item.intensity} />
-                  {used !== "—" && <span className="text-[13px]/[18px] text-ink-muted">{used}</span>}
-                </div>
-              </div>
-              {canEdit && menu(row)}
-            </li>
-          );
-        })}
-      </ul>
+    <div className="flex flex-col gap-6">
+      {songRows.length > 0 && (
+        <RowsSection
+          title={both ? "Canciones" : undefined}
+          rows={songRows.map((item): Row => ({ kind: "song", item }))}
+          usage={usage}
+          canEdit={canEdit}
+        />
+      )}
+      {selectionRows.length > 0 && (
+        <RowsSection
+          title={both ? "Enganchados" : undefined}
+          rows={selectionRows.map((item): Row => ({ kind: "selection", item }))}
+          usage={usage}
+          canEdit={canEdit}
+        />
+      )}
     </div>
   );
   if (!canEdit) return list;
@@ -220,11 +153,104 @@ function RepertoireList({
   );
 }
 
-function RowType({ row }: { row: Row }) {
-  return row.kind === "song" ? (
-    <span className="text-[13px]/[18px] text-ink-muted">Canción</span>
-  ) : (
-    <Tag>Enganchado</Tag>
+// One kind of row (all Canciones or all Enganchados): a table from 640px up,
+// stacked cards below.
+function RowsSection({
+  title,
+  rows,
+  usage,
+  canEdit,
+}: {
+  title?: string;
+  rows: Row[];
+  usage: Map<string, number>;
+  canEdit: boolean;
+}) {
+  const isSong = rows[0].kind === "song";
+  const menu = (row: Row) =>
+    row.kind === "song" ? <SongMenu song={row.item} /> : <SelectionMenu selection={row.item} />;
+  return (
+    <section className="flex flex-col gap-3">
+      {title && <h2 className="m-0 text-heading">{title}</h2>}
+      <div className="rounded-lg border border-line bg-bg-2">
+        <table className="w-full border-collapse max-sm:hidden">
+          <thead>
+            <tr>
+              <th className={th}>Título</th>
+              {isSong && <th className={th}>Tono</th>}
+              <th className={th}>Duración</th>
+              <th className={th}>Intensidad</th>
+              {isSong && <th className={th}>Usado en</th>}
+              {canEdit && (
+                <th className={th}>
+                  <span className="sr-only">Acciones</span>
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.item.id}>
+                <td className={td}>
+                  <span className="font-medium">{row.item.name}</span>
+                  {row.kind === "selection" && (
+                    <span className="block text-[12px]/[16px] text-ink-muted">
+                      {songOrder(row.item)}
+                    </span>
+                  )}
+                </td>
+                {row.kind === "song" && (
+                  <td className={`${td} font-mono text-num`}>{row.item.key ?? "—"}</td>
+                )}
+                <td className={`${td} font-mono text-num`}>
+                  {formatClock(row.item.durationSeconds)}
+                </td>
+                <td className={td}>
+                  <IntensityMeter intensity={row.item.intensity} />
+                </td>
+                {isSong && (
+                  <td className={`${td} text-[13px]/[18px] whitespace-nowrap text-ink-muted`}>
+                    {usedIn(row, usage)}
+                  </td>
+                )}
+                {canEdit && <td className={`${td} text-right`}>{menu(row)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ul className="m-0 hidden list-none p-0 max-sm:block">
+          {rows.map((row) => {
+            const used = usedIn(row, usage);
+            return (
+              <li
+                key={row.item.id}
+                className="flex items-start gap-3 border-line p-4 not-first:border-t"
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex flex-col">
+                    <span className="text-[14px]/[20px] font-medium">{row.item.name}</span>
+                    {row.kind === "selection" && (
+                      <span className="text-[12px]/[16px] text-ink-muted">
+                        {songOrder(row.item)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {row.kind === "song" && <Fact label="Tono">{row.item.key ?? "—"}</Fact>}
+                    <Fact label="Duración">{formatClock(row.item.durationSeconds)}</Fact>
+                    <IntensityMeter intensity={row.item.intensity} />
+                    {used !== "—" && (
+                      <span className="text-[13px]/[18px] text-ink-muted">{used}</span>
+                    )}
+                  </div>
+                </div>
+                {canEdit && menu(row)}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
 

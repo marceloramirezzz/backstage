@@ -14,7 +14,7 @@ export interface SongFormState {
 }
 
 const SONG_ERRORS: Partial<Record<ServiceError["code"], string>> = {
-  invalid_input: "Revisá el título y la duración: una canción dura hasta 99:59.",
+  invalid_input: "Revisá el título, el tono y la duración: una canción dura hasta 99:59.",
   forbidden: "Tu rol no puede editar el repertorio.",
   not_found: "Esta canción ya no está en el repertorio.",
 };
