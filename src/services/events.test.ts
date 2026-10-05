@@ -350,6 +350,7 @@ const toggles = (change: Partial<RoleToggles>): RoleToggles => ({
   editRepertoireSetlistsEvents: false,
   removeMembers: false,
   seeTotalPayExpenses: false,
+  manageBookings: false,
   ...change,
 });
 

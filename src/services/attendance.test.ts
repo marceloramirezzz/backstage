@@ -27,6 +27,7 @@ async function band(db: TestDb, name: string) {
     editRepertoireSetlistsEvents: true,
     removeMembers: false,
     seeTotalPayExpenses,
+    manageBookings: false,
   });
   const director = await createRole(db.pool, owner, project.id, {
     name: "Director",

@@ -24,6 +24,7 @@ const NO_TOGGLES: RoleToggles = {
   editRepertoireSetlistsEvents: false,
   removeMembers: false,
   seeTotalPayExpenses: false,
+  manageBookings: false,
 };
 
 async function roleOf(db: TestDb, owner: User, project: Project, kind: Role["kind"]) {

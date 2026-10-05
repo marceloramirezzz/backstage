@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { DoorMark } from "@/components/ui/brand.tsx";
+import { BookingForm } from "./booking-form.tsx";
 import { IntensityMeter } from "@/components/ui/intensity-meter.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
@@ -168,6 +169,14 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
             </ul>
           </section>
         )}
+
+        <section
+          id="contratanos"
+          className="flex flex-col gap-5 rounded-xl border border-line bg-bg-2 p-10 max-sm:p-5"
+        >
+          <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Contratanos</h2>
+          <BookingForm slug={slug} bandName={page.name} />
+        </section>
 
         {page.contacts.length > 0 && (
           <section

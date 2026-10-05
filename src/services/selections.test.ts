@@ -329,11 +329,11 @@ async function band(db: TestDb, name: string) {
   assert.ok(memberRole);
   const editorRole = await createRole(db.pool, owner, project.id, {
     name: "Arreglador",
-    toggles: { editRepertoireSetlistsEvents: true, removeMembers: false, seeTotalPayExpenses: false },
+    toggles: { editRepertoireSetlistsEvents: true, removeMembers: false, seeTotalPayExpenses: false , manageBookings: false},
   });
   const roadieRole = await createRole(db.pool, owner, project.id, {
     name: "Roadie",
-    toggles: { editRepertoireSetlistsEvents: false, removeMembers: true, seeTotalPayExpenses: true },
+    toggles: { editRepertoireSetlistsEvents: false, removeMembers: true, seeTotalPayExpenses: true , manageBookings: false},
   });
   const [member, editor, roadie, outsider] = [
     await user("member"),

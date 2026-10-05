@@ -3,6 +3,7 @@ import {
   DollarSign,
   Globe,
   House,
+  Inbox,
   ListMusic,
   LogOut,
   Music,
@@ -29,6 +30,7 @@ import { HOME_SECTION, SECTIONS, type SectionPath } from "./sections.ts";
 
 const ICONS: Record<SectionPath, ReactNode> = {
   calendario: <Calendar {...iconProps} />,
+  solicitudes: <Inbox {...iconProps} />,
   resumen: <House {...iconProps} />,
   repertorio: <Music {...iconProps} />,
   setlists: <ListMusic {...iconProps} />,
@@ -52,7 +54,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps<"/
   });
 
   const base = `/p/${project.id}`;
-  const items = SECTIONS.filter((s) => !s.adminOnly || permissions.administer).map((s) => ({
+  const items = SECTIONS.filter((s) => !s.requires || permissions[s.requires]).map((s) => ({
     href: `${base}/${s.path}`,
     label: s.label,
     icon: ICONS[s.path],

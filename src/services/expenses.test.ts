@@ -22,7 +22,7 @@ async function band(db: TestDb, name: string) {
   const roleWith = (roleName: string, edit: boolean, see: boolean) =>
     createRole(db.pool, owner, project.id, {
       name: roleName,
-      toggles: { editRepertoireSetlistsEvents: edit, removeMembers: false, seeTotalPayExpenses: see },
+      toggles: { editRepertoireSetlistsEvents: edit, removeMembers: false, seeTotalPayExpenses: see , manageBookings: false},
     });
   const roles = {
     director: await roleWith("Director", true, false),

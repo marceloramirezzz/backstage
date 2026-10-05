@@ -12,6 +12,7 @@ export const ROLE_TOGGLE_COLUMNS = {
   editRepertoireSetlistsEvents: "can_edit_repertoire_setlists_events",
   removeMembers: "can_remove_members",
   seeTotalPayExpenses: "can_see_total_pay_expenses",
+  manageBookings: "can_manage_bookings",
 } as const;
 
 export type RoleToggle = keyof typeof ROLE_TOGGLE_COLUMNS;
@@ -35,6 +36,7 @@ function resolvePermissions(kind: RoleKind, toggles: RoleToggles | null): Permis
         editRepertoireSetlistsEvents: true,
         removeMembers: true,
         seeTotalPayExpenses: true,
+        manageBookings: true,
         seeOthersPayoutSplits: true,
         administer: true,
       };
@@ -43,6 +45,7 @@ function resolvePermissions(kind: RoleKind, toggles: RoleToggles | null): Permis
         editRepertoireSetlistsEvents: false,
         removeMembers: false,
         seeTotalPayExpenses: true,
+        manageBookings: false,
         seeOthersPayoutSplits: false,
         administer: false,
       };
