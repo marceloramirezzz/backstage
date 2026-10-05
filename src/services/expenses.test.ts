@@ -171,4 +171,32 @@ describe("expenses", () => {
     const { rows } = await db.pool.query("SELECT 1 FROM event_expenses WHERE event_id = $1", [event.id]);
     assert.equal(rows.length, 0);
   });
+
+  it("records an Expense's category", async () => {
+    const { owner, project, event } = await band(db, "category");
+
+    await addExpense(db.pool, owner, project.id, event.id, {
+      name: "Van",
+      amount: 100_000,
+      category: "transport",
+    });
+    await addExpense(db.pool, owner, project.id, event.id, { name: "Cena", amount: 50_000 });
+    const { expenses } = (await getExpenses(db.pool, owner, project.id, event.id))!;
+
+    assert.equal(expenses[0].category, "transport");
+    assert.equal(expenses[1].category, "other");
+  });
+
+  it("refuses an unknown category", async () => {
+    const { owner, project, event } = await band(db, "badcategory");
+
+    await assert.rejects(
+      addExpense(db.pool, owner, project.id, event.id, {
+        name: "Van",
+        amount: 1,
+        category: "bogus" as "other",
+      }),
+      { code: "invalid_input" },
+    );
+  });
 });

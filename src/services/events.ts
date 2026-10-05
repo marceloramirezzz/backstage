@@ -45,6 +45,8 @@ export interface Event {
   location: string | null;
   // Cachet in whole Guaraníes. Null for those who can't see total pay.
   pay: number | null;
+  // Null for those who can't see total pay.
+  bandFundBasisPoints: number | null;
   // The whole gig, breaks and sound check included.
   durationMinutes: number;
   status: EventStatus;
@@ -59,6 +61,9 @@ export interface EventInput {
   location?: string | null;
   // Defaults to 0. Needs both the edit and the see-pay permissions.
   pay?: number;
+  // Share of the net kept for the band before the split, in basis points (0–50%). Defaults to 0;
+  // needs both the edit and the see-pay permissions.
+  bandFundBasisPoints?: number;
   durationMinutes: number;
   status?: EventStatus;
   isPublic?: boolean;
@@ -74,6 +79,7 @@ export type EventPatch = Partial<EventInput>;
 const EVENT_COLUMNS = `e.id, e.name, to_char(e.date, 'YYYY-MM-DD') AS date,
   to_char(e.start_time, 'HH24:MI') AS "startTime", e.location,
   CASE WHEN $1 THEN e.pay::float8 END AS pay,
+  CASE WHEN $1 THEN e.band_fund_basis_points END AS "bandFundBasisPoints",
   e.duration_minutes AS "durationMinutes", e.status, e.is_public AS "isPublic",
   CASE WHEN e.setlist_copied_at IS NOT NULL THEN json_build_object(
     'name', e.setlist_name, 'category', e.setlist_category, 'copiedAt', e.setlist_copied_at,
@@ -150,8 +156,8 @@ export async function updateEvent(
   if (!isUuid(eventId)) throw new ServiceError("not_found", "Event not found");
   return inTransaction(pool, async (client) => {
     const columns = Object.keys(fields);
-    const { rows: before } = await client.query<{ status: EventStatus; pay: string }>(
-      "SELECT status, pay FROM events WHERE id = $1 AND project_id = $2 FOR UPDATE",
+    const { rows: before } = await client.query<{ status: EventStatus; pay: string; fund: number }>(
+      "SELECT status, pay, band_fund_basis_points AS fund FROM events WHERE id = $1 AND project_id = $2 FOR UPDATE",
       [eventId, projectId],
     );
     const { rowCount } = await client.query(
@@ -163,10 +169,12 @@ export async function updateEvent(
     if (setlistId) await copySetlist(client, projectId, eventId, setlistId);
     if (setlistId === null) await clearSetlist(client, eventId);
     // Paid freezes the payout; leaving Paid unfreezes it. Other edits to a Paid
-    // Event leave the snapshot alone, only its pay re-freezes it.
+    // Event leave the snapshot alone, only its pay or band fund re-freezes it.
     const paid = (fields.status ?? before[0].status) === "paid";
+    const payChanged = fields.pay !== undefined && String(fields.pay) !== before[0].pay;
+    const fundChanged = fields.band_fund_basis_points !== undefined && fields.band_fund_basis_points !== before[0].fund;
     if (!paid) await dropSnapshot(client, eventId);
-    else if (before[0].status !== "paid" || (fields.pay !== undefined && String(fields.pay) !== before[0].pay)) {
+    else if (before[0].status !== "paid" || payChanged || fundChanged) {
       await takeSnapshot(client, projectId, eventId);
     }
     return findEvent(client, projectId, eventId, permissions);
@@ -245,7 +253,7 @@ async function copySetlist(
   await client.query("DELETE FROM event_setlist_items WHERE event_id = $1", [eventId]);
   await client.query(
     `INSERT INTO event_setlist_items
-       (event_id, position, kind, name, key, duration_seconds, intensity, songs)
+       (event_id, position, kind, name, key, duration_seconds, intensity, songs, lyrics)
      SELECT $1, si.position, CASE WHEN si.song_id IS NOT NULL THEN 'song' ELSE 'selection' END,
        coalesce(s.name, sel.name), s.key, coalesce(s.duration_seconds, sel.duration_seconds),
        coalesce(s.intensity, sel.intensity),
@@ -253,7 +261,8 @@ async function copySetlist(
           'durationSeconds', ss_song.duration_seconds, 'intensity', ss_song.intensity)
           ORDER BY ss.position)
         FROM selection_songs ss JOIN songs ss_song ON ss_song.id = ss.song_id
-        WHERE ss.selection_id = si.selection_id)
+        WHERE ss.selection_id = si.selection_id),
+       coalesce(s.lyrics, sel.lyrics)
      FROM setlist_items si
      LEFT JOIN songs s ON s.id = si.song_id
      LEFT JOIN selections sel ON sel.id = si.selection_id
@@ -335,6 +344,16 @@ function validFields(
       throw new ServiceError("forbidden", "You can't set the pay of an Event you can't see it of");
     }
     out.pay = pay;
+  }
+  if (input.bandFundBasisPoints !== undefined) {
+    const { bandFundBasisPoints: bp } = input;
+    if (!Number.isSafeInteger(bp) || (bp as number) < 0 || (bp as number) > 5000) {
+      throw invalid("An Event's band fund must be between 0% and 50%");
+    }
+    if (!permissions.seeTotalPayExpenses) {
+      throw new ServiceError("forbidden", "You can't set the band fund of an Event you can't see the pay of");
+    }
+    out.band_fund_basis_points = bp;
   }
   if (has("status")) {
     if (!EVENT_STATUSES.includes(input.status as EventStatus)) throw invalid("Unknown Event status");

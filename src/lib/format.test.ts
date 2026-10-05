@@ -5,7 +5,6 @@ import {
   formatDuration,
   formatExpiresIn,
   formatGuaranies,
-  formatGuaraniesCompact,
   formatTimeRange,
 } from "./format.ts";
 
@@ -30,37 +29,6 @@ describe("formatGuaranies", () => {
 
   it("puts the sign before the currency", () => {
     assert.equal(formatGuaranies(-400_000), "-Gs. 400.000");
-  });
-});
-
-describe("formatGuaraniesCompact", () => {
-  it("formats zero and small amounts in full", () => {
-    assert.equal(formatGuaraniesCompact(0), "Gs. 0");
-    assert.equal(formatGuaraniesCompact(950), "Gs. 950");
-    assert.equal(formatGuaraniesCompact(999_999), "Gs. 999.999");
-  });
-
-  it("shows millions with one decimal comma", () => {
-    assert.equal(formatGuaraniesCompact(18_200_000), "Gs. 18,2M");
-    assert.equal(formatGuaraniesCompact(1_500_000), "Gs. 1,5M");
-  });
-
-  it("rounds to the nearest hundred thousand", () => {
-    assert.equal(formatGuaraniesCompact(18_249_999), "Gs. 18,2M");
-    assert.equal(formatGuaraniesCompact(18_250_000), "Gs. 18,3M");
-  });
-
-  it("drops a zero decimal, including when rounding up", () => {
-    assert.equal(formatGuaraniesCompact(18_000_000), "Gs. 18M");
-    assert.equal(formatGuaraniesCompact(1_960_000), "Gs. 2M");
-  });
-
-  it("groups thousands of millions", () => {
-    assert.equal(formatGuaraniesCompact(1_234_500_000), "Gs. 1.234,5M");
-  });
-
-  it("puts the sign before the currency", () => {
-    assert.equal(formatGuaraniesCompact(-2_500_000), "-Gs. 2,5M");
   });
 });
 

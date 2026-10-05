@@ -155,4 +155,20 @@ describe("computePayout", () => {
     assert.equal(amounts(r).x + amounts(r).y, 9_000_000_000_000);
     assert.equal(amounts(r).y, 6_000_300_000_000);
   });
+
+  it("sets the band fund aside from the net before fixed amounts and percentages", () => {
+    const r = computePayout({ ...BASE, fundBasisPoints: 1000 });
+    assert.equal(r.fund, 350_000);
+    assert.equal(r.fixedTotal, 650_000);
+    assert.equal(r.remainder, 2_500_000);
+    const paid = r.members.reduce((sum, m) => sum + m.amount, 0) + r.guests.reduce((sum, g) => sum + g.amount, 0);
+    assert.equal(paid + r.fund + r.unallocated, BASE.net);
+  });
+
+  it("counts the band fund toward over-allocation", () => {
+    const r = computePayout({ ...BASE, net: 1_000_000, fundBasisPoints: 5000 });
+    assert.equal(r.overAllocated, true);
+    assert.equal(r.fund, 0);
+    assert.equal(r.shortfall, 150_000);
+  });
 });

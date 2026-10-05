@@ -45,7 +45,16 @@ export async function findSnapshot(db: Db, eventId: string): Promise<FrozenEvent
   );
   if (!rows[0]) return null;
   const frozenAt = rows[0].takenAt.toISOString();
-  return { payout: { ...rows[0].payload.payout, frozenAt }, attendance: rows[0].payload.attendance, frozenAt };
+  // Snapshots frozen before the band fund existed lack those fields.
+  const old: Partial<FullPayout> & Pick<FullPayout, "result"> = rows[0].payload.payout;
+  const payout = {
+    ...old,
+    fundBasisPoints: old.fundBasisPoints ?? 0,
+    categories: old.categories ?? [],
+    result: { ...old.result, fund: old.result.fund ?? 0 },
+    frozenAt,
+  } as FullPayout;
+  return { payout, attendance: rows[0].payload.attendance, frozenAt };
 }
 
 // The Event's Payout: frozen if it's Paid, a live preview otherwise.

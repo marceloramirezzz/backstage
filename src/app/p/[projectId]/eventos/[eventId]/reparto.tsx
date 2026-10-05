@@ -24,6 +24,13 @@ function FrozenNotice({ frozenAt }: { frozenAt: string }) {
   );
 }
 
+const Tile = ({ label, amount }: { label: string; amount: number }) => (
+  <div className="flex flex-col gap-1 rounded-md bg-bg-2 p-3">
+    <span className="text-[12px]/[16px] text-ink-muted">{label}</span>
+    <span className="font-mono text-[16px]/[22px] font-medium">{formatGuaranies(amount)}</span>
+  </div>
+);
+
 const Line = ({ label, amount, strong, minus }: { label: ReactNode; amount: number; strong?: boolean; minus?: boolean }) => (
   <div className={`flex justify-between gap-4 ${strong ? "font-semibold" : "text-ink-muted"}`}>
     <dt className="min-w-0">{label}</dt>
@@ -51,8 +58,8 @@ export function RepartoSection({
 }) {
   if (payout.scope === "own") {
     return (
-      <section aria-labelledby="reparto-title" className="flex flex-col gap-3 rounded-lg border border-line bg-bg-1 p-4">
-        <h2 id="reparto-title" className="m-0 text-heading">
+      <section aria-labelledby="reparto-title" className="flex flex-col gap-3 rounded-lg border border-line bg-bg-1 p-3">
+        <h2 id="reparto-title" className="m-0 text-[12px]/[16px] font-semibold uppercase tracking-wide text-ink-muted">
           Reparto
         </h2>
         {payout.frozenAt && <FrozenNotice frozenAt={payout.frozenAt} />}
@@ -74,11 +81,14 @@ export function RepartoSection({
   const skipped = payout.roles.filter((r) => r.skipped);
   const percentTotal = percentRoles.reduce((sum, r) => sum + r.value, 0);
   const noRules = payout.rules.length === 0;
+  const fixedTotal = result.fixedTotal;
+  const peopleTotal =
+    result.members.reduce((sum, m) => sum + m.amount, 0) + result.guests.reduce((sum, g) => sum + g.amount, 0);
 
   return (
-    <section aria-labelledby="reparto-title" className="flex flex-col gap-4 rounded-lg border border-line bg-bg-1 p-4">
+    <section aria-labelledby="reparto-title" className="flex flex-col gap-3 rounded-lg border border-line bg-bg-1 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="reparto-title" className="m-0 flex items-center gap-2 text-heading">
+        <h2 id="reparto-title" className="m-0 flex items-center gap-2 text-[12px]/[16px] font-semibold uppercase tracking-wide text-ink-muted">
           Reparto
           {payout.frozenAt && <Tag>Congelado</Tag>}
         </h2>
@@ -104,12 +114,28 @@ export function RepartoSection({
 
       {noRules && <p className="m-0 text-[14px]/[20px] text-ink-muted">Todavía no hay un reparto configurado: nadie cobra parte.</p>}
 
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-3">
+        <Tile label="Gastos" amount={payout.expensesTotal} />
+        {result.fund > 0 && (
+          <Tile label={`Fondo de la banda · ${basisPointsToPercent(payout.fundBasisPoints)} %`} amount={result.fund} />
+        )}
+        <Tile label="Montos fijos" amount={fixedTotal} />
+        <Tile label="A repartir por porcentaje" amount={result.remainder} />
+      </div>
+
       <dl className="m-0 flex flex-col gap-2 text-[14px]/[20px]">
         <Line label="Cachet" amount={payout.pay} />
         <Line label="Gastos" amount={payout.expensesTotal} minus />
         <div className="border-t border-line pt-2">
           <Line label="Neto" amount={payout.net} strong />
         </div>
+        {result.fund > 0 && (
+          <Line
+            minus
+            label={`Fondo de la banda ${basisPointsToPercent(payout.fundBasisPoints)} %`}
+            amount={result.fund}
+          />
+        )}
         {fixedRoles.map((r) => (
           <Line
             key={r.roleId}
@@ -162,7 +188,9 @@ export function RepartoSection({
                 <tr key={a.userId} className="border-t border-line">
                   <td className="py-2 pr-3">{a.displayName}</td>
                   <td className="py-2 pr-3 text-ink-muted">{roleLabel(r.roleKind, r.name)}</td>
-                  <td className="py-2 text-right font-mono text-[13px]">{formatGuaranies(a.amount)}</td>
+                  <td className="py-2 text-right font-mono text-[13px]">
+                    {formatGuaranies(a.amount)}
+                  </td>
                 </tr>
               )),
             )}
@@ -176,6 +204,25 @@ export function RepartoSection({
           </tbody>
         </table>
       </div>
+
+      {!result.overAllocated && (
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">
+          Personas <span className="font-mono">{formatGuaranies(peopleTotal)}</span>
+          {result.fund > 0 && (
+            <>
+              {" "}+ fondo <span className="font-mono">{formatGuaranies(result.fund)}</span>
+            </>
+          )}{" "}
+          + gastos{" "}
+          <span className="font-mono">{formatGuaranies(payout.expensesTotal)}</span>
+          {result.unallocated > 0 && (
+            <>
+              {" "}+ sin repartir <span className="font-mono">{formatGuaranies(result.unallocated)}</span>
+            </>
+          )}{" "}
+          = <span className="font-mono">{formatGuaranies(payout.pay)}</span>
+        </p>
+      )}
 
       {split && (
         <details className="border-t border-line pt-3">

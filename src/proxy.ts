@@ -25,5 +25,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/p/:path*", "/bienvenida", "/ajustes"],
+  matcher: ["/p/:path*", "/teleprompter/:path*", "/bienvenida", "/ajustes"],
 };

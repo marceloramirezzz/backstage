@@ -9,7 +9,7 @@ export const todayIn = (timeZone = DEFAULT_TIME_ZONE) =>
 
 // Dot thousands, written out by hand: Spanish locales in Intl skip grouping
 // for four-digit numbers ("4500"), and the UI always groups.
-const groupThousands = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+export const groupThousands = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
 const withCurrency = (amount: number, figure: string) =>
   `${amount < 0 ? "-" : ""}Gs. ${figure}`;
@@ -17,15 +17,6 @@ const withCurrency = (amount: number, figure: string) =>
 // `Gs. 4.500.000`
 export function formatGuaranies(amount: number): string {
   return withCurrency(amount, groupThousands(String(Math.abs(Math.round(amount)))));
-}
-
-// `Gs. 18,2M`, for stat tiles only. Amounts under a million are shown in full.
-export function formatGuaraniesCompact(amount: number): string {
-  if (Math.abs(amount) < 1_000_000) return formatGuaranies(amount);
-  const tenthsOfMillion = Math.round(Math.abs(amount) / 100_000);
-  const whole = groupThousands(String(Math.floor(tenthsOfMillion / 10)));
-  const tenth = tenthsOfMillion % 10;
-  return withCurrency(amount, `${whole}${tenth ? `,${tenth}` : ""}M`);
 }
 
 const clockFormats = new Map<string, Intl.DateTimeFormat>();

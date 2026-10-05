@@ -109,17 +109,17 @@ describe("attendance", () => {
     );
   });
 
-  it("never lets anyone edit their own Attendance, editors and Admins included", async () => {
-    const { owner, project, director, event } = await band(db, "own");
+  it("lets an editor edit their own Attendance, but not a Member without the permission", async () => {
+    const { owner, project, member, event } = await band(db, "own");
 
-    for (const user of [owner, director]) {
-      await assert.rejects(setAttending(db.pool, user, project.id, event.id, user.id, false), {
-        code: "forbidden",
-      });
-    }
-    assert.ok(
-      (await getAttendance(db.pool, owner, project.id, event.id)).members.every((m) => m.attending),
-    );
+    await setAttending(db.pool, owner, project.id, event.id, owner.id, false);
+    const unticked = await getAttendance(db.pool, owner, project.id, event.id);
+    await assert.rejects(setAttending(db.pool, member, project.id, event.id, member.id, false), {
+      code: "forbidden",
+    });
+
+    assert.equal(unticked.members.find((m) => m.userId === owner.id)?.attending, false);
+    assert.equal(unticked.members.find((m) => m.userId === member.id)?.attending, true);
   });
 
   it("reports a User who isn't a Member of the Project as not found", async () => {

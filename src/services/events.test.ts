@@ -84,6 +84,7 @@ describe("events", () => {
       durationMinutes: 240,
       status: "pending",
       isPublic: false,
+      bandFundBasisPoints: 0,
       setlist: null,
     });
     const names = (await listEvents(db.pool, owner, project.id)).map((e) => e.name);

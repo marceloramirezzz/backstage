@@ -14,6 +14,8 @@ export interface SplitRule {
 export interface PayoutInput {
   // Pay minus Expenses; may be negative.
   net: number;
+  // Share of the net kept for the band before anything is split, in basis points. Defaults to 0.
+  fundBasisPoints?: number;
   rules: SplitRule[];
   // Members who played, in a stable order.
   attendees: { userId: string; roleId: string }[];
@@ -37,7 +39,9 @@ export interface RolePayout {
 export interface PayoutResult {
   net: number;
   overAllocated: boolean;
-  // How far the fixed amounts exceed the net (or Expenses exceed pay); 0 when not over-allocated.
+  // Kept for the band off the net, before the fixed amounts; 0 when over-allocated.
+  fund: number;
+  // How far the fund and fixed amounts exceed the net (or Expenses exceed pay); 0 when not over-allocated.
   shortfall: number;
   // Fixed amounts (Roles and Guests) taken off the net first.
   fixedTotal: number;
@@ -46,12 +50,14 @@ export interface PayoutResult {
   roles: RolePayout[];
   members: { userId: string; roleId: string; amount: number }[];
   guests: { id: string; amount: number }[];
-  // Net that nobody receives: no percentage Role attended, or no one to take the rounding.
+  // Net that nobody receives (besides the fund): no percentage Role attended, or no one to take the rounding.
   unallocated: number;
 }
 
 export function computePayout(input: PayoutInput): PayoutResult {
   const { net, rules, attendees, guests, remainderRecipient } = input;
+  // Rounded down: the fund never takes more than its share.
+  const fund = net > 0 ? Number((BigInt(net) * BigInt(input.fundBasisPoints ?? 0)) / BigInt(10_000)) : 0;
   const roles: RolePayout[] = rules.map((rule) => {
     const attendeeIds = attendees.filter((a) => a.roleId === rule.roleId).map((a) => a.userId);
     return { ...rule, attendeeIds, skipped: attendeeIds.length === 0, amount: 0 };
@@ -66,7 +72,7 @@ export function computePayout(input: PayoutInput): PayoutResult {
     present.reduce((sum, r) => sum + (r.kind === "percentage" ? 0 : r.amount), 0) +
     guests.reduce((sum, g) => sum + g.amount, 0);
 
-  const shortfall = Math.max(0, fixedTotal - net);
+  const shortfall = Math.max(0, fixedTotal - (net - fund));
   const overAllocated = net < 0 || shortfall > 0;
   const members = attendees.map((a) => ({ userId: a.userId, roleId: a.roleId, amount: 0 }));
 
@@ -76,6 +82,7 @@ export function computePayout(input: PayoutInput): PayoutResult {
     return {
       net,
       overAllocated,
+      fund: 0,
       shortfall: Math.max(shortfall, -net),
       fixedTotal,
       remainder: 0,
@@ -86,7 +93,7 @@ export function computePayout(input: PayoutInput): PayoutResult {
     };
   }
 
-  const remainder = net - fixedTotal;
+  const remainder = net - fund - fixedTotal;
   const percentRoles = present.filter((r) => r.kind === "percentage");
   const percentTotal = percentRoles.reduce((sum, r) => sum + r.value, 0);
   if (percentTotal > 0) {
@@ -114,6 +121,7 @@ export function computePayout(input: PayoutInput): PayoutResult {
   return {
     net,
     overAllocated,
+    fund,
     shortfall: 0,
     fixedTotal,
     remainder,

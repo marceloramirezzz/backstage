@@ -11,6 +11,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "verificar",
   "recuperar",
   "restablecer",
+  "teleprompter",
   "api",
   "brand",
   "favicon",

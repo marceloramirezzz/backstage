@@ -59,8 +59,8 @@ export async function getAttendance(
   return { members: await liveMembers(pool, projectId, eventId), guests: guests.rows };
 }
 
-// Ticks or unticks a Member. Nobody edits their own, so a Member can't
-// excuse themselves from the pay split (or add themselves back).
+// Ticks or unticks a Member. Whoever can edit the Event may do it for any
+// Member, themselves included.
 export async function setAttending(
   pool: Pool,
   user: User,
@@ -71,9 +71,6 @@ export async function setAttending(
 ): Promise<void> {
   const permissions = await getPermissions(pool, user, projectId);
   requireEdit(permissions);
-  if (memberUserId === user.id) {
-    throw new ServiceError("forbidden", "You can't edit your own Attendance");
-  }
   await requireEvent(pool, projectId, eventId);
   const { rows } = isUuid(memberUserId)
     ? await pool.query("SELECT 1 FROM memberships WHERE project_id = $1 AND user_id = $2", [

@@ -8,6 +8,7 @@ import {
 import { FormMessage } from "@/components/auth-screen.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input, Select } from "@/components/ui/field.tsx";
+import { groupThousands } from "@/lib/format.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { basisPointsToPercent, NO_RULE, percentToBasisPoints } from "@/lib/split-form.ts";
 import type { SplitKind, SplitRole, SplitRule } from "@/services/splits.ts";
@@ -108,7 +109,7 @@ export function SplitEditor({
                 aria-label={`Monto para ${label}`}
                 inputMode={row.kind === "percentage" ? "decimal" : "numeric"}
                 disabled={row.kind === NO_RULE}
-                value={row.value}
+                value={row.kind === "percentage" ? row.value : groupThousands(row.value.replace(/\D/g, ""))}
                 onChange={(e) => set(role.id, { value: e.target.value })}
                 className={`text-right font-mono ${row.kind === "percentage" ? "pr-9" : ""}`}
               />

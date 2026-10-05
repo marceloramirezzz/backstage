@@ -6,7 +6,6 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import {
   DeleteEventDialog,
   EventDialog,
-  type SetlistOption,
 } from "@/components/events/event-dialogs.tsx";
 import { Button, buttonClass, IconButton } from "@/components/ui/button.tsx";
 import { Dialog } from "@/components/ui/dialog.tsx";
@@ -59,7 +58,6 @@ export function CalendarView({
   month,
   today,
   events,
-  setlists,
   canEdit,
   canSetPay,
   canDeletePaid,
@@ -71,7 +69,6 @@ export function CalendarView({
   month: string;
   today: string;
   events: Event[];
-  setlists: SetlistOption[];
   canEdit: boolean;
   canSetPay: boolean;
   canDeletePaid: boolean;
@@ -288,7 +285,6 @@ export function CalendarView({
         projectId={projectId}
         event={dialog === "edit" ? (target ?? undefined) : undefined}
         defaultDate={defaultDate}
-        setlists={setlists}
         canSetPay={canSetPay}
         open={dialog === "new" || dialog === "edit"}
         onClose={closeDialog}
