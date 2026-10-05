@@ -1,4 +1,7 @@
+import { ScrollText } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { iconProps } from "@/components/ui/icon-props.ts";
 import { IntensityMeter } from "@/components/ui/intensity-meter.tsx";
 import { getPool } from "@/db/pool.ts";
 import { formatClock } from "@/lib/format.ts";
@@ -6,6 +9,7 @@ import { requireUser } from "@/lib/session.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { listSelections, type Selection } from "@/services/selections.ts";
 import { INTENSITIES, listSongs, type Song } from "@/services/songs.ts";
+import { teleprompterHref } from "@/lib/teleprompter-href.ts";
 import { RepertoireFilters, type RepertoireType } from "./repertoire-filters.tsx";
 import { NewSelectionButton, SelectionDialogs, SelectionMenu } from "./selection-controls.tsx";
 import { NewSongButton, SongDialogs, SongMenu } from "./song-controls.tsx";
@@ -127,6 +131,7 @@ function RepertoireList({
     <div className="flex flex-col gap-6">
       {songRows.length > 0 && (
         <RowsSection
+          projectId={projectId}
           title={both ? "Canciones" : undefined}
           rows={songRows.map((item): Row => ({ kind: "song", item }))}
           usage={usage}
@@ -135,6 +140,7 @@ function RepertoireList({
       )}
       {selectionRows.length > 0 && (
         <RowsSection
+          projectId={projectId}
           title={both ? "Enganchados" : undefined}
           rows={selectionRows.map((item): Row => ({ kind: "selection", item }))}
           usage={usage}
@@ -156,11 +162,13 @@ function RepertoireList({
 // One kind of row (all Canciones or all Enganchados): a table from 640px up,
 // stacked cards below.
 function RowsSection({
+  projectId,
   title,
   rows,
   usage,
   canEdit,
 }: {
+  projectId: string;
   title?: string;
   rows: Row[];
   usage: Map<string, number>;
@@ -192,7 +200,10 @@ function RowsSection({
             {rows.map((row) => (
               <tr key={row.item.id}>
                 <td className={td}>
-                  <span className="font-medium">{row.item.name}</span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-medium">{row.item.name}</span>
+                    <LyricsLink projectId={projectId} row={row} />
+                  </span>
                   {row.kind === "selection" && (
                     <span className="block text-[12px]/[16px] text-ink-muted">
                       {songOrder(row.item)}
@@ -228,7 +239,10 @@ function RowsSection({
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex flex-col">
-                    <span className="text-[14px]/[20px] font-medium">{row.item.name}</span>
+                    <span className="inline-flex items-center gap-2 text-[14px]/[20px] font-medium">
+                      {row.item.name}
+                      <LyricsLink projectId={projectId} row={row} />
+                    </span>
                     {row.kind === "selection" && (
                       <span className="text-[12px]/[16px] text-ink-muted">
                         {songOrder(row.item)}
@@ -251,6 +265,20 @@ function RowsSection({
         </ul>
       </div>
     </section>
+  );
+}
+
+// Opens the lyrics in the teleprompter; any Member can.
+function LyricsLink({ projectId, row }: { projectId: string; row: Row }) {
+  return (
+    <Link
+      href={teleprompterHref(projectId, { kind: row.kind, id: row.item.id })}
+      aria-label={`Ver la letra de ${row.item.name}`}
+      title="Letra"
+      className="inline-flex text-ink-subtle hover:text-ink"
+    >
+      <ScrollText {...iconProps} />
+    </Link>
   );
 }
 

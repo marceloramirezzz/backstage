@@ -6,7 +6,6 @@ import { todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
 import { EVENT_STATUSES, listEvents } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
-import { listSetlists } from "@/services/setlists.ts";
 import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { CalendarView } from "./calendar-view.tsx";
 
@@ -33,10 +32,10 @@ export default async function CalendarPage({
   const days = monthGrid(month);
   const permissions = await getPermissions(pool, user, projectId);
   const canEdit = permissions.editRepertoireSetlistsEvents;
-  const [events, setlists] = await Promise.all([
-    listEvents(pool, user, projectId, { from: days[0].date, to: days.at(-1)!.date }),
-    canEdit ? listSetlists(pool, user, projectId) : [],
-  ]);
+  const events = await listEvents(pool, user, projectId, {
+    from: days[0].date,
+    to: days.at(-1)!.date,
+  });
 
   const inMonth = events.filter((e) => e.date.startsWith(month));
   const toPlay = inMonth.filter(
@@ -68,7 +67,6 @@ export default async function CalendarPage({
         month={month}
         today={today}
         events={events}
-        setlists={setlists.map(({ id, name }) => ({ id, name }))}
         canEdit={canEdit}
         canSetPay={canEdit && permissions.seeTotalPayExpenses}
         canDeletePaid={permissions.administer}

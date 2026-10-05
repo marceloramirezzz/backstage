@@ -12,22 +12,17 @@ import { FormMessage } from "@/components/auth-screen.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Dialog } from "@/components/ui/dialog.tsx";
 import { Field, Input, Select } from "@/components/ui/field.tsx";
+import { MoneyInput } from "@/components/ui/money-input.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { STATUS_OPTIONS } from "@/lib/event-status.ts";
 import { submitKeepingFields } from "@/lib/submit-keeping-fields.ts";
 import type { Event } from "@/services/events.ts";
-
-export interface SetlistOption {
-  id: string;
-  name: string;
-}
 
 // Adds an Evento, or edits `event`. Creating opens the new Evento's page.
 export function EventDialog({
   projectId,
   event,
   defaultDate,
-  setlists,
   canSetPay,
   open,
   onClose,
@@ -36,8 +31,6 @@ export function EventDialog({
   event?: Event;
   // The day a new Evento starts on.
   defaultDate?: string;
-  // The template Setlists an Evento can copy.
-  setlists: SetlistOption[];
   // Whether the User may also set the Cachet.
   canSetPay: boolean;
   open: boolean;
@@ -49,7 +42,6 @@ export function EventDialog({
         projectId={projectId}
         event={event}
         defaultDate={defaultDate}
-        setlists={setlists}
         canSetPay={canSetPay}
         onClose={onClose}
       />
@@ -61,14 +53,12 @@ function EventForm({
   projectId,
   event,
   defaultDate,
-  setlists,
   canSetPay,
   onClose,
 }: {
   projectId: string;
   event?: Event;
   defaultDate?: string;
-  setlists: SetlistOption[];
   canSetPay: boolean;
   onClose: () => void;
 }) {
@@ -82,7 +72,6 @@ function EventForm({
   }, [state.saved]);
 
   const minutes = event?.durationMinutes ?? 60;
-  const copied = event?.setlist;
   return (
     <form onSubmit={submitKeepingFields(action)} className="flex flex-col gap-4">
       <input type="hidden" name="projectId" value={projectId} />
@@ -130,8 +119,7 @@ function EventForm({
             inputMode="numeric"
             min={0}
             max={59}
-            defaultValue={minutes % 60}
-            required
+            defaultValue={minutes % 60 || ""}
             className="font-mono"
           />
         </Field>
@@ -142,14 +130,9 @@ function EventForm({
       <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
         {canSetPay && (
           <Field label="Cachet (Gs.)">
-            <Input
+            <MoneyInput
               name="pay"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              defaultValue={event?.pay ?? 0}
-              required
+              defaultValue={event?.pay ?? ""}
               className="font-mono"
             />
           </Field>
@@ -164,26 +147,6 @@ function EventForm({
           </Select>
         </Field>
       </div>
-      <Field
-        label="Setlist"
-        hint="Se copia al elegirla: editar la plantilla después no cambia este evento."
-      >
-        <Select name="setlistId" defaultValue={copied ? "keep" : ""}>
-          {copied ? (
-            <>
-              <option value="keep">Mantener la copia actual ({copied.name})</option>
-              <option value="none">Sin setlist</option>
-            </>
-          ) : (
-            <option value="">Sin setlist</option>
-          )}
-          {setlists.map((setlist) => (
-            <option key={setlist.id} value={setlist.id}>
-              {copied ? `Copiar de nuevo: ${setlist.name}` : setlist.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
       <label className="flex items-center gap-2 text-[14px]/[20px]">
         <input
           type="checkbox"

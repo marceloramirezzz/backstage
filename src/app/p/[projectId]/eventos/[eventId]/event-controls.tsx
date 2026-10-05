@@ -8,7 +8,6 @@ import { FormMessage } from "@/components/auth-screen.tsx";
 import {
   DeleteEventDialog,
   EventDialog,
-  type SetlistOption,
 } from "@/components/events/event-dialogs.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Select } from "@/components/ui/field.tsx";
@@ -21,13 +20,11 @@ import type { Event, EventStatus } from "@/services/events.ts";
 export function EventControls({
   projectId,
   event,
-  setlists,
   canSetPay,
   canDelete,
 }: {
   projectId: string;
   event: Event;
-  setlists: SetlistOption[];
   canSetPay: boolean;
   canDelete: boolean;
 }) {
@@ -81,7 +78,6 @@ export function EventControls({
       <EventDialog
         projectId={projectId}
         event={event}
-        setlists={setlists}
         canSetPay={canSetPay}
         open={dialog === "edit"}
         onClose={close}

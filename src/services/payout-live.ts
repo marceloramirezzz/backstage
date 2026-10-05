@@ -22,6 +22,10 @@ export interface FullPayout {
   pay: number;
   expensesTotal: number;
   net: number;
+  // The Event's band fund share of the net, in basis points.
+  fundBasisPoints: number;
+  // Expenses by category, in a stable order; only those with something spent.
+  categories: { category: string; amount: number }[];
   result: PayoutResult;
   roles: {
     roleId: string;
@@ -74,13 +78,18 @@ export async function projectRoles(db: Db, projectId: string): Promise<SplitRole
 // as they are now.
 export async function livePayout(db: Db, projectId: string, eventId: string): Promise<FullPayout> {
   const { source, rules } = await effectiveRules(db, projectId, eventId);
-  const { rows: events } = await db.query<{ pay: number; expensesTotal: number; ownerId: string }>(
-    `SELECT e.pay::float8 AS pay, p.owner_id AS "ownerId",
+  const { rows: events } = await db.query<{ pay: number; expensesTotal: number; ownerId: string; fundBasisPoints: number }>(
+    `SELECT e.pay::float8 AS pay, p.owner_id AS "ownerId", e.band_fund_basis_points AS "fundBasisPoints",
        (SELECT coalesce(sum(x.amount), 0)::float8 FROM event_expenses x WHERE x.event_id = e.id) AS "expensesTotal"
      FROM events e JOIN projects p ON p.id = e.project_id WHERE e.id = $1`,
     [eventId],
   );
-  const { pay, expensesTotal, ownerId } = events[0];
+  const { pay, expensesTotal, ownerId, fundBasisPoints } = events[0];
+  const { rows: categories } = await db.query<{ category: string; amount: number }>(
+    `SELECT category, sum(amount)::float8 AS amount FROM event_expenses
+     WHERE event_id = $1 GROUP BY category ORDER BY min(created_at)`,
+    [eventId],
+  );
   const { rows: attending } = await db.query<{ userId: string; displayName: string; roleId: string }>(
     `SELECT u.id AS "userId", u.display_name AS "displayName", m.role_id AS "roleId"
      FROM memberships m
@@ -98,7 +107,7 @@ export async function livePayout(db: Db, projectId: string, eventId: string): Pr
   // The Owner takes the rounding; if they didn't play, the first who did.
   const recipient = (attending.find((a) => a.userId === ownerId) ?? attending[0])?.userId ?? null;
   const net = pay - expensesTotal;
-  const result = computePayout({ net, rules, attendees: attending, guests, remainderRecipient: recipient });
+  const result = computePayout({ net, fundBasisPoints, rules, attendees: attending, guests, remainderRecipient: recipient });
   const names = new Map(attending.map((a) => [a.userId, a.displayName]));
   return {
     scope: "full",
@@ -108,6 +117,8 @@ export async function livePayout(db: Db, projectId: string, eventId: string): Pr
     pay,
     expensesTotal,
     net,
+    fundBasisPoints,
+    categories,
     result,
     roles: result.roles.map((r) => ({
       roleId: r.roleId,

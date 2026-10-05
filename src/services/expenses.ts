@@ -7,17 +7,24 @@ import { inTransaction } from "./transaction.ts";
 import { syncSnapshot } from "./payout-snapshots.ts";
 import { getPermissions, type Permissions } from "./permissions.ts";
 
+export const EXPENSE_CATEGORIES = ["transport", "sound", "rentals", "food", "other"] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
 // A cost tied to one Event.
 export interface Expense {
   id: string;
   name: string;
   // Whole Guaraníes.
   amount: number;
+  category: ExpenseCategory;
 }
 
 export interface ExpenseInput {
   name: string;
   amount: number;
+  // Defaults to "other".
+  category?: ExpenseCategory;
+  // A Member of the Project; defaults to the band's cash.
 }
 
 export interface ExpenseSummary {
@@ -40,8 +47,9 @@ export async function getExpenses(
   await requireEvent(pool, projectId, eventId);
   if (!permissions.seeTotalPayExpenses) return null;
   const { rows: expenses } = await pool.query<Expense>(
-    `SELECT id, name, amount::float8 AS amount
-     FROM event_expenses WHERE event_id = $1 ORDER BY created_at, id`,
+    `SELECT x.id, x.name, x.amount::float8 AS amount, x.category
+     FROM event_expenses x
+     WHERE x.event_id = $1 ORDER BY x.created_at, x.id`,
     [eventId],
   );
   const { rows } = await pool.query<{ pay: number }>(
@@ -66,14 +74,19 @@ export async function addExpense(
   if (!Number.isSafeInteger(amount) || amount < 0) {
     throw new ServiceError("invalid_input", "An Expense's amount must be a whole amount of Guaraníes");
   }
+  const category = input.category ?? "other";
+  if (!EXPENSE_CATEGORIES.includes(category)) {
+    throw new ServiceError("invalid_input", "Unknown kind of Expense");
+  }
   await requireEvent(pool, projectId, eventId);
   return inTransaction(pool, async (client) => {
     const { rows } = await client.query<{ id: string }>(
-      "INSERT INTO event_expenses (event_id, name, amount) VALUES ($1, $2, $3) RETURNING id",
-      [eventId, name, amount],
+      `INSERT INTO event_expenses (event_id, name, amount, category)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [eventId, name, amount, category],
     );
     await syncSnapshot(client, projectId, eventId);
-    return { id: rows[0].id, name, amount };
+    return { id: rows[0].id, name, amount, category };
   });
 }
 

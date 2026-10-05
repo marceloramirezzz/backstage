@@ -6,7 +6,7 @@ import { StatTile } from "@/components/ui/stat-tile.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { addMonths, eventTimeRange, formatLongDate, formatMonthTitle, parseMonth, periodRange } from "@/lib/calendar.ts";
-import { formatGuaraniesCompact, todayIn } from "@/lib/format.ts";
+import { formatGuaranies, todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
 import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { getDashboard } from "@/services/dashboard.ts";
@@ -84,13 +84,13 @@ export default async function DashboardPage({
           lead
           label="Cobrado"
           icon={<CircleDollarSign {...iconProps} />}
-          value={formatGuaraniesCompact(dashboard.earned)}
+          value={formatGuaranies(dashboard.earned)}
           foot={own ? "Tu parte" : plural(dashboard.paidShows, "evento pagado", "eventos pagados")}
         />
         <StatTile
           label="Por cobrar"
           icon={<Clock {...iconProps} />}
-          value={formatGuaraniesCompact(dashboard.expected)}
+          value={formatGuaranies(dashboard.expected)}
           foot={own ? "Tu parte" : `${plural(dashboard.confirmedShows, "confirmado", "confirmados")}, esperando el pago`}
         />
       </div>

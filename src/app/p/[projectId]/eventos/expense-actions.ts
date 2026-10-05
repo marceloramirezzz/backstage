@@ -5,7 +5,7 @@ import { getPool } from "@/db/pool.ts";
 import { text, whole } from "@/lib/form.ts";
 import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
-import { addExpense, removeExpense } from "@/services/expenses.ts";
+import { addExpense, removeExpense, type ExpenseCategory } from "@/services/expenses.ts";
 
 export interface ExpenseActionState {
   error?: string;
@@ -16,7 +16,7 @@ export interface ExpenseActionState {
 const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
   forbidden: "Tu rol no puede editar los gastos de este evento.",
   not_found: "Este evento o este gasto ya no existe.",
-  invalid_input: "Revisá el nombre y el monto (en guaraníes enteros).",
+  invalid_input: "Revisá el nombre, el monto (en guaraníes enteros) y quién lo pagó.",
 };
 
 // The message for a failed call, or a rethrow when it isn't expected.
@@ -40,6 +40,8 @@ export async function addEventExpense(
     addExpense(getPool(), user, text(form, "projectId"), text(form, "eventId"), {
       name: text(form, "name"),
       amount: whole(text(form, "amount")),
+      category: text(form, "category") as ExpenseCategory,
+      // Empty means the band's cash paid.
     }),
   );
   return error ? { ...prev, error } : { done: prev.done + 1 };

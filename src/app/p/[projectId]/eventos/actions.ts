@@ -33,7 +33,7 @@ export async function saveEvent(prev: EventFormState, form: FormData): Promise<E
   const projectId = text(form, "projectId");
   const eventId = text(form, "eventId");
   const hours = whole(text(form, "hours"));
-  const minutes = whole(text(form, "minutes"));
+  const minutes = text(form, "minutes").trim() === "" ? 0 : whole(text(form, "minutes"));
   const setlist = text(form, "setlistId");
   const input: EventInput = {
     name: text(form, "name"),
@@ -45,7 +45,10 @@ export async function saveEvent(prev: EventFormState, form: FormData): Promise<E
     isPublic: form.get("isPublic") === "on",
   };
   // The field is only there for those who may set the pay.
-  if (form.has("pay")) input.pay = whole(text(form, "pay"));
+  // Left blank, it is the default of 0.
+  if (form.has("pay")) input.pay = text(form, "pay").trim() === "" ? 0 : whole(text(form, "pay"));
+  // Percent with up to two decimals in the form, basis points in the service.
+  if (form.has("bandFund")) input.bandFundBasisPoints = Math.round(Number(text(form, "bandFund")) * 100);
   if (setlist === "none") input.setlistId = null;
   else if (setlist && setlist !== "keep") input.setlistId = setlist;
 

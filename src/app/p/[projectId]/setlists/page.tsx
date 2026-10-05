@@ -1,11 +1,15 @@
+import { ScrollText } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buttonClass } from "@/components/ui/button.tsx";
+import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { requireUser } from "@/lib/session.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { listSelections } from "@/services/selections.ts";
 import { listSetlists, type Setlist } from "@/services/setlists.ts";
 import { listSongs } from "@/services/songs.ts";
+import { teleprompterHref } from "@/lib/teleprompter-href.ts";
 import { NewSetlistButton, SetlistEditor, SetlistView } from "./setlist-editor.tsx";
 import { SetlistPicker } from "./setlist-picker.tsx";
 import { formatTotal } from "./total.ts";
@@ -50,11 +54,18 @@ export default async function SetlistsPage({
               pasados.
             </p>
           </div>
-          {canEdit && (
-            <div className="ml-auto flex flex-wrap items-center gap-3">
-              <NewSetlistButton projectId={projectId} />
-            </div>
-          )}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            {current && current.items.length > 0 && (
+              <Link
+                href={teleprompterHref(projectId, { kind: "setlist", id: current.id })}
+                className={buttonClass({ variant: "secondary" })}
+              >
+                <ScrollText {...iconProps} />
+                Teleprompter
+              </Link>
+            )}
+            {canEdit && <NewSetlistButton projectId={projectId} />}
+          </div>
         </div>
         {current ? (
           <div className="grid grid-cols-[300px_minmax(0,1fr)] items-start gap-6 max-desktop:grid-cols-[minmax(0,1fr)]">
