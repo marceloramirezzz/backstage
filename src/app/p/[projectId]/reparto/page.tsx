@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SplitEditor } from "@/app/p/[projectId]/split-editor.tsx";
+import { MemberRuleRowForm } from "@/app/p/[projectId]/member-rules-editor.tsx";
 import { Avatar } from "@/components/ui/brand.tsx";
 import { buttonClass } from "@/components/ui/button.tsx";
 import { getPool } from "@/db/pool.ts";
@@ -11,7 +11,7 @@ import { initials } from "@/lib/initials.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { requireUser } from "@/lib/session.ts";
 import { getPermissions } from "@/services/permissions.ts";
-import { getDefaultSplit, listPersonTotals } from "@/services/splits.ts";
+import { getMemberRules, listPersonTotals } from "@/services/splits.ts";
 
 export const metadata: Metadata = { title: "Reparto · Backstage" };
 
@@ -43,8 +43,8 @@ export default async function PayoutsPage({
   const byYear = first(query.periodo) === "anio";
   const year = month.slice(0, 4);
   const period = periodRange(month, byYear);
-  const [split, totals] = await Promise.all([
-    getDefaultSplit(pool, user, projectId),
+  const [memberRules, totals] = await Promise.all([
+    getMemberRules(pool, user, projectId),
     listPersonTotals(pool, user, projectId, period),
   ]);
   const href = (m: string, periodo = byYear ? "anio" : "mes") => `/p/${projectId}/reparto?periodo=${periodo}&mes=${m}`;
@@ -62,18 +62,16 @@ export default async function PayoutsPage({
         </div>
       </div>
 
-      <Card title="Reparto de la banda" aside={<span className="text-[12px] text-ink-muted">Cada evento puede tener el suyo</span>}>
-        {split.roles.length ? (
-          <SplitEditor
-            key={JSON.stringify(split.rules)}
-            projectId={projectId}
-            roles={split.roles}
-            rules={split.rules}
-            submitLabel="Guardar reparto"
-          />
-        ) : (
-          <p className="m-0 text-[14px]/[20px] text-ink-muted">Esta banda no tiene roles.</p>
-        )}
+      <Card title="Reglas por miembro" aside={<span className="text-[12px] text-ink-muted">Por defecto, para todos los eventos</span>}>
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">
+          Cada miembro cobra una parte igual del neto o un monto fijo. Los montos fijos salen primero y el resto se
+          divide en partes iguales entre quienes tocaron. Cada evento puede cambiarlo.
+        </p>
+        <div className="flex flex-col">
+          {memberRules.map((member) => (
+            <MemberRuleRowForm key={`${member.userId}-${member.rule.kind}-${member.rule.value}`} projectId={projectId} member={member} />
+          ))}
+        </div>
       </Card>
 
       <Card
