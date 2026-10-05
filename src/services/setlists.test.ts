@@ -418,6 +418,7 @@ async function band(db: TestDb, name: string) {
       editRepertoireSetlistsEvents: true,
       removeMembers: false,
       seeTotalPayExpenses: false,
+      manageBookings: false,
     },
   });
   const roadieRole = await createRole(db.pool, owner, project.id, {
@@ -426,6 +427,7 @@ async function band(db: TestDb, name: string) {
       editRepertoireSetlistsEvents: false,
       removeMembers: true,
       seeTotalPayExpenses: true,
+      manageBookings: false,
     },
   });
   const [member, editor, roadie, outsider] = [

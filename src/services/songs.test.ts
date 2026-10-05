@@ -12,6 +12,7 @@ const NO_TOGGLES: RoleToggles = {
   editRepertoireSetlistsEvents: false,
   removeMembers: false,
   seeTotalPayExpenses: false,
+  manageBookings: false,
 };
 
 // Invites the User with the Role and accepts, so they join the Project.
@@ -36,7 +37,7 @@ async function band(db: TestDb, name: string) {
   });
   const roadieRole = await createRole(db.pool, owner, project.id, {
     name: "Roadie",
-    toggles: { removeMembers: true, seeTotalPayExpenses: true, editRepertoireSetlistsEvents: false },
+    toggles: { removeMembers: true, seeTotalPayExpenses: true, manageBookings: false, editRepertoireSetlistsEvents: false },
   });
   const [member, editor, roadie, outsider] = [
     await user("member"),

@@ -21,12 +21,14 @@ const NO_TOGGLES: RoleToggles = {
   editRepertoireSetlistsEvents: false,
   removeMembers: false,
   seeTotalPayExpenses: false,
+  manageBookings: false,
 };
 
 const ALL_TOGGLES: RoleToggles = {
   editRepertoireSetlistsEvents: true,
   removeMembers: true,
   seeTotalPayExpenses: true,
+  manageBookings: true,
 };
 
 // Invites the User with the Role and accepts, so they join the Project.
@@ -90,6 +92,7 @@ describe("getPermissions", () => {
       editRepertoireSetlistsEvents: true,
       removeMembers: true,
       seeTotalPayExpenses: true,
+      manageBookings: true,
       seeOthersPayoutSplits: true,
       administer: true,
     } satisfies Permissions);
@@ -102,6 +105,7 @@ describe("getPermissions", () => {
       editRepertoireSetlistsEvents: false,
       removeMembers: false,
       seeTotalPayExpenses: true,
+      manageBookings: false,
       seeOthersPayoutSplits: false,
       administer: false,
     } satisfies Permissions);

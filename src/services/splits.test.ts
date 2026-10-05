@@ -33,7 +33,7 @@ async function band(db: TestDb, name: string) {
   const memberRole = roles.find((r) => r.kind === "member")!;
   const roadieRole = await createRole(db.pool, owner, project.id, {
     name: "Roadie",
-    toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+    toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false , manageBookings: false},
   });
   const hire = async (who: string, roleId: string) => {
     const user = await verifiedUser(db, `${name}-${who}@example.com`);
@@ -233,7 +233,7 @@ describe("payout splits", () => {
     const b = await band(db, "gone");
     const extra = await createRole(db.pool, b.owner, b.project.id, {
       name: "Sonidista",
-      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false , manageBookings: false},
     });
     await setDefaultSplit(db.pool, b.owner, b.project.id, [
       { roleId: extra.id, kind: "role_fixed", value: 1 },

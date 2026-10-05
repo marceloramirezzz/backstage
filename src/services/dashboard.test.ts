@@ -33,7 +33,7 @@ describe("Dashboard", () => {
     const memberRole = roles.find((r) => r.kind === "member")!;
     const roadieRole = await createRole(db.pool, owner, project.id, {
       name: "Roadie",
-      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false, manageBookings: false },
     });
     const hire = async (who: string, roleId: string) => {
       const user = await verifiedUser(db, `${name}-${who}@example.com`);

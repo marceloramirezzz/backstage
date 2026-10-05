@@ -395,7 +395,7 @@ describe("resendInvitation", () => {
     const { owner, project } = await band(db, "resend-deleted-role");
     const roadie = await createRole(db.pool, owner, project.id, {
       name: "Roadie",
-      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false, manageBookings: false },
     });
     const sentAt = new Date(Date.now() - 8 * DAY_MS);
     const [{ invitation }] = await sendInvitations(
@@ -416,7 +416,7 @@ describe("resendInvitation", () => {
     const { owner, project } = await band(db, "deleted-role-landing");
     const roadie = await createRole(db.pool, owner, project.id, {
       name: "Roadie",
-      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false },
+      toggles: { editRepertoireSetlistsEvents: false, removeMembers: false, seeTotalPayExpenses: false, manageBookings: false },
     });
     const sentAt = new Date(Date.now() - 8 * DAY_MS);
     const [{ token }] = await sendInvitations(

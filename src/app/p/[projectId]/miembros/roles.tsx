@@ -27,6 +27,11 @@ const TOGGLE_COPY: { toggle: keyof RoleToggles; label: string; hint?: string }[]
     label: "Ver cachet y gastos totales por evento",
     hint: "Apagado: solo ven su propia parte.",
   },
+  {
+    toggle: "manageBookings",
+    label: "Gestionar solicitudes",
+    hint: "Ven y trabajan las solicitudes de contratación y reciben un correo con cada una nueva.",
+  },
 ];
 
 const NEW = "new";
@@ -140,6 +145,7 @@ function BuiltInRole({ role }: { role: RoleCard }) {
       <Toggle label="Editar repertorio, setlists y eventos" checked={admin} readOnly locked />
       <Toggle label="Quitar miembros" checked={admin} readOnly locked />
       <Toggle label="Ver cachet y gastos totales por evento" checked readOnly locked />
+      <Toggle label="Gestionar solicitudes" checked={admin} readOnly locked />
       <LockedToggles seesOthers={admin} />
       <Holders count={role.holders} />
     </div>
