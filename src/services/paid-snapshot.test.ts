@@ -11,15 +11,15 @@ import { changeMemberRole, listRoles } from "./roles.ts";
 import {
   getEventPayout,
   listPersonTotals,
-  setDefaultSplit,
-  setEventSplit,
+  setEventMemberSetting,
+  setMemberRule,
   type FullPayout,
 } from "./splits.ts";
 
 const EVENT = { name: "Casamiento Ríos", date: "2026-09-26", durationMinutes: 240, pay: 4_000_000 };
 
-// Admin Diego (Owner), Members Lucía and Rodrigo; default split gives Admins
-// 25% and Members 75% of the net. Gs. 500.000 of Expenses, so net is 3.500.000.
+// Admin Diego (Owner), Members Lucía and Rodrigo, all on Equal share.
+// Gs. 500.000 of Expenses, so net is 3.500.000.
 async function band(db: TestDb, name: string) {
   const owner = await verifiedUser(db, `${name}-diego@example.com`);
   const project = await createProject(db.pool, owner, { name });
@@ -36,10 +36,6 @@ async function band(db: TestDb, name: string) {
   };
   const lucia = await hire("lucia");
   const rodrigo = await hire("rodrigo");
-  await setDefaultSplit(db.pool, owner, project.id, [
-    { roleId: adminRole.id, kind: "percentage", value: 2500 },
-    { roleId: memberRole.id, kind: "percentage", value: 7500 },
-  ]);
   const event = await createEvent(db.pool, owner, project.id, EVENT);
   await addExpense(db.pool, owner, project.id, event.id, { name: "Van", amount: 500_000 });
   const payout = async () => {
@@ -50,7 +46,7 @@ async function band(db: TestDb, name: string) {
   const status = (s: "pending" | "confirmed" | "paid" | "cancelled") =>
     updateEvent(db.pool, owner, project.id, event.id, { status: s });
   const shares = async () =>
-    Object.fromEntries((await payout()).roles.flatMap((r) => r.attendees.map((a) => [a.displayName, a.amount])));
+    Object.fromEntries((await payout()).members!.map((m) => [m.displayName, m.amount]));
   return { owner, project, adminRole, memberRole, lucia, rodrigo, event, payout, status, shares };
 }
 
@@ -76,14 +72,12 @@ describe("Paid snapshot", () => {
     assert.deepEqual(await b.shares(), live);
   });
 
-  it("ignores later Role, Membership and default-split changes", async () => {
+  it("ignores later Role, Membership and rule changes", async () => {
     const b = await band(db, "later");
     await b.status("paid");
     const frozen = await b.shares();
     await changeMemberRole(db.pool, b.owner, b.project.id, b.lucia.id, b.adminRole.id);
-    await setDefaultSplit(db.pool, b.owner, b.project.id, [
-      { roleId: b.adminRole.id, kind: "percentage", value: 10_000 },
-    ]);
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "fixed", value: 1_000_000 });
     const newcomer = await verifiedUser(db, "later-newcomer@example.com");
     const [{ invitation }] = await sendInvitations(db.pool, b.owner, b.project.id, [
       { email: newcomer.email, roleId: b.memberRole.id },
@@ -118,48 +112,45 @@ describe("Paid snapshot", () => {
   it("makes the numbers live again when leaving Paid", async () => {
     const b = await band(db, "unfreeze");
     await b.status("paid");
-    await setDefaultSplit(db.pool, b.owner, b.project.id, [
-      { roleId: b.adminRole.id, kind: "percentage", value: 10_000 },
-    ]);
-    assert.ok((await b.shares())[b.lucia.displayName] > 0);
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "fixed", value: 1_000_000 });
+    assert.equal((await b.shares())[b.lucia.displayName], 1_166_666);
     await b.status("confirmed");
     const p = await b.payout();
     assert.equal(p.frozenAt, null);
-    assert.equal((await b.shares())[b.lucia.displayName], undefined);
+    assert.equal((await b.shares())[b.lucia.displayName], 1_000_000);
   });
 
   it("takes a new snapshot when returning to Paid", async () => {
     const b = await band(db, "return");
     await b.status("paid");
     await b.status("confirmed");
-    await setDefaultSplit(db.pool, b.owner, b.project.id, [
-      { roleId: b.adminRole.id, kind: "percentage", value: 10_000 },
-    ]);
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "fixed", value: 1_000_000 });
     await b.status("paid");
-    assert.equal((await b.shares())[b.lucia.displayName], undefined);
-    assert.equal((await b.shares())[b.owner.displayName], 3_500_000);
+    assert.equal((await b.shares())[b.lucia.displayName], 1_000_000);
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "equal", value: 0 });
+    assert.equal((await b.shares())[b.lucia.displayName], 1_000_000);
   });
 
-  it("re-freezes when a Paid Event's split or Attendance is edited", async () => {
+  it("re-freezes when a Paid Event's rules or Attendance are edited", async () => {
     const b = await band(db, "refreeze");
     await b.status("paid");
     await setAttending(db.pool, b.owner, b.project.id, b.event.id, b.rodrigo.id, false);
     let shares = await b.shares();
     assert.equal(shares[b.rodrigo.displayName], undefined);
-    assert.equal(shares[b.lucia.displayName], 2_625_000);
-    await setEventSplit(db.pool, b.owner, b.project.id, b.event.id, [
-      { roleId: b.memberRole.id, kind: "percentage", value: 10_000 },
-    ]);
+    assert.equal(shares[b.lucia.displayName], 1_750_000);
+    await setEventMemberSetting(db.pool, b.owner, b.project.id, b.event.id, b.lucia.id, {
+      override: { kind: "fixed", value: 500_000 },
+      ajuste: 100_000,
+    });
     shares = await b.shares();
-    assert.equal(shares[b.lucia.displayName], 3_500_000);
+    assert.equal(shares[b.lucia.displayName], 600_000);
+    assert.equal(shares[b.owner.displayName], 2_900_000);
     await addGuest(db.pool, b.owner, b.project.id, b.event.id, { name: "Nahuel", amount: 350_000 });
     const p = await b.payout();
     assert.equal(p.guests[0].amount, 350_000);
-    // Later default-split changes still don't reach it.
-    await setDefaultSplit(db.pool, b.owner, b.project.id, [
-      { roleId: b.adminRole.id, kind: "percentage", value: 10_000 },
-    ]);
-    assert.equal((await b.shares())[b.lucia.displayName], 3_150_000);
+    // Later default-rule changes still don't reach it.
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "fixed", value: 1 });
+    assert.equal((await b.shares())[b.lucia.displayName], 600_000);
   });
 
   it("re-freezes when a Paid Event's pay or Expenses change", async () => {
@@ -175,20 +166,18 @@ describe("Paid snapshot", () => {
     const b = await band(db, "own");
     await b.status("paid");
     const own = await getEventPayout(db.pool, b.lucia, b.project.id, b.event.id);
-    assert.deepEqual(own, { scope: "own", amount: 1_312_500, frozenAt: (await b.payout()).frozenAt });
+    assert.deepEqual(own, { scope: "own", amount: 1_166_666, frozenAt: (await b.payout()).frozenAt });
   });
 
   it("counts a Paid Event's frozen amounts as earned", async () => {
     const b = await band(db, "totals");
     await b.status("paid");
-    await setDefaultSplit(db.pool, b.owner, b.project.id, [
-      { roleId: b.adminRole.id, kind: "percentage", value: 10_000 },
-    ]);
+    await setMemberRule(db.pool, b.owner, b.project.id, b.lucia.id, { kind: "fixed", value: 1 });
     const totals = await listPersonTotals(db.pool, b.owner, b.project.id, {
       from: "2026-09-01",
       to: "2026-09-30",
     });
-    assert.equal(totals.find((t) => t.userId === b.lucia.id)!.earned, 1_312_500);
+    assert.equal(totals.find((t) => t.userId === b.lucia.id)!.earned, 1_166_666);
   });
 
   it("freezes an Event created already Paid", async () => {

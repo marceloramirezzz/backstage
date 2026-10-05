@@ -22,7 +22,7 @@ import { getAttendance } from "@/services/attendance.ts";
 import { getExpenses } from "@/services/expenses.ts";
 import { getEvent, type Event } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
-import { getEventPayout, getEventSplit } from "@/services/splits.ts";
+import { getEventMemberRules, getEventPayout } from "@/services/splits.ts";
 import { formatTotal } from "../../setlists/total.ts";
 import { teleprompterHref } from "@/lib/teleprompter-href.ts";
 import { AttendanceSection } from "./attendance.tsx";
@@ -52,7 +52,7 @@ export default async function EventPage({
   const expenses = await getExpenses(pool, user, projectId, eventId);
   const payout = await getEventPayout(pool, user, projectId, eventId);
   const split = permissions.administer
-    ? await getEventSplit(pool, user, projectId, eventId)
+    ? await getEventMemberRules(pool, user, projectId, eventId)
     : undefined;
 
   return (

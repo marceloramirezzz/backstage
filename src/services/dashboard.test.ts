@@ -9,7 +9,7 @@ import { addExpense } from "./expenses.ts";
 import { acceptInvitation, sendInvitations } from "./invitations.ts";
 import { createProject } from "./projects.ts";
 import { createRole, listRoles } from "./roles.ts";
-import { setDefaultSplit } from "./splits.ts";
+import { setMemberRule } from "./splits.ts";
 
 const SEPTEMBER = { from: "2026-09-01", to: "2026-09-30" };
 const YEAR = { from: "2026-01-01", to: "2026-12-31" };
@@ -23,13 +23,12 @@ describe("Dashboard", () => {
     await db.close();
   });
 
-  // Diego (Admin) and Lucía (Member) split 50/50; Roadie Sofía has a custom
-  // Role without "see total pay" and gets a flat Gs. 100.000 per Event.
+  // Diego (Admin) and Lucía (Member) split what is left equally; Roadie Sofía
+  // has a custom Role without "see total pay" and gets a flat Gs. 100.000 per Event.
   async function band(name: string) {
     const owner = await verifiedUser(db, `${name}-diego@example.com`);
     const project = await createProject(db.pool, owner, { name });
     const roles = await listRoles(db.pool, owner, project.id);
-    const adminRole = roles.find((r) => r.kind === "admin")!;
     const memberRole = roles.find((r) => r.kind === "member")!;
     const roadieRole = await createRole(db.pool, owner, project.id, {
       name: "Roadie",
@@ -43,11 +42,7 @@ describe("Dashboard", () => {
     };
     const lucia = await hire("lucia", memberRole.id);
     const sofia = await hire("sofia", roadieRole.id);
-    await setDefaultSplit(db.pool, owner, project.id, [
-      { roleId: adminRole.id, kind: "percentage", value: 5000 },
-      { roleId: memberRole.id, kind: "percentage", value: 5000 },
-      { roleId: roadieRole.id, kind: "member_fixed", value: 100_000 },
-    ]);
+    await setMemberRule(db.pool, owner, project.id, sofia.id, { kind: "fixed", value: 100_000 });
     const gig = async (date: string, pay: number, status: "pending" | "confirmed" | "paid" | "cancelled") => {
       const event = await createEvent(db.pool, owner, project.id, { name: `Gig ${date}`, date, durationMinutes: 120, pay });
       await updateEvent(db.pool, owner, project.id, event.id, { status });

@@ -1,13 +1,12 @@
 import { AlertTriangle, Lock } from "lucide-react";
 import type { ReactNode } from "react";
-import { SplitEditor } from "@/app/p/[projectId]/split-editor.tsx";
+import { EventMemberRowForm } from "@/app/p/[projectId]/member-rules-editor.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { Tag } from "@/components/ui/tag.tsx";
 import { formatGuaranies, formatShortDate } from "@/lib/format.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { basisPointsToPercent } from "@/lib/split-form.ts";
-import type { EventPayout, SplitRole, SplitRule } from "@/services/splits.ts";
-import { UseDefaultSplitButton } from "./use-default-split.tsx";
+import type { EventMemberRuleRow, EventPayout } from "@/services/splits.ts";
 
 // Says the Reparto is a snapshot: a Pagado Evento keeps its amounts whatever
 // happens to the band's Roles, Miembros or default Reparto afterwards.
@@ -53,8 +52,8 @@ export function RepartoSection({
   projectId: string;
   eventId: string;
   payout: EventPayout;
-  // Only for Admins: the Evento's rules and the Roles to edit them for.
-  split?: { rules: SplitRule[]; roles: SplitRole[] };
+  // Only for Admins: each Miembro's rule, override and Ajuste for this Evento.
+  split?: EventMemberRuleRow[];
 }) {
   if (payout.scope === "own") {
     return (
@@ -76,11 +75,16 @@ export function RepartoSection({
   }
 
   const { result } = payout;
-  const fixedRoles = payout.roles.filter((r) => !r.skipped && r.kind !== "percentage");
-  const percentRoles = payout.roles.filter((r) => !r.skipped && r.kind === "percentage");
-  const skipped = payout.roles.filter((r) => r.skipped);
+  // Snapshots frozen before per-Miembro rules are Role-based and have no `members`.
+  const legacyRoles = payout.members ? [] : (payout.roles ?? []);
+  const fixedRoles = legacyRoles.filter((r) => !r.skipped && r.kind !== "percentage");
+  const percentRoles = legacyRoles.filter((r) => !r.skipped && r.kind === "percentage");
+  const skipped = legacyRoles.filter((r) => r.skipped);
   const percentTotal = percentRoles.reduce((sum, r) => sum + r.value, 0);
-  const noRules = payout.rules.length === 0;
+  const members = payout.members ?? [];
+  const fixedMembers = members.filter((m) => m.rule.kind === "fixed");
+  const equalMembers = members.filter((m) => m.rule.kind === "equal");
+  const adjusted = members.filter((m) => m.ajuste !== 0);
   const fixedTotal = result.fixedTotal;
   const peopleTotal =
     result.members.reduce((sum, m) => sum + m.amount, 0) + result.guests.reduce((sum, g) => sum + g.amount, 0);
@@ -92,9 +96,11 @@ export function RepartoSection({
           Reparto
           {payout.frozenAt && <Tag>Congelado</Tag>}
         </h2>
-        <span className="text-[13px]/[18px] text-ink-muted">
-          {payout.source === "event" ? "Reparto propio de este evento" : "Reparto de la banda"}
-        </span>
+        {payout.source && (
+          <span className="text-[13px]/[18px] text-ink-muted">
+            {payout.source === "event" ? "Reparto propio de este evento" : "Reparto de la banda"}
+          </span>
+        )}
       </div>
 
       {payout.frozenAt && <FrozenNotice frozenAt={payout.frozenAt} />}
@@ -112,15 +118,13 @@ export function RepartoSection({
         </p>
       )}
 
-      {noRules && <p className="m-0 text-[14px]/[20px] text-ink-muted">Todavía no hay un reparto configurado: nadie cobra parte.</p>}
-
       <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-3">
         <Tile label="Gastos" amount={payout.expensesTotal} />
         {result.fund > 0 && (
           <Tile label={`Fondo de la banda · ${basisPointsToPercent(payout.fundBasisPoints)} %`} amount={result.fund} />
         )}
         <Tile label="Montos fijos" amount={fixedTotal} />
-        <Tile label="A repartir por porcentaje" amount={result.remainder} />
+        <Tile label={payout.members ? "A repartir en partes iguales" : "A repartir por porcentaje"} amount={result.remainder} />
       </div>
 
       <dl className="m-0 flex flex-col gap-2 text-[14px]/[20px]">
@@ -136,6 +140,12 @@ export function RepartoSection({
             amount={result.fund}
           />
         )}
+        {fixedMembers.map((m) => (
+          <Line key={m.userId} minus label={`${m.displayName} (fijo)`} amount={m.rule.value} />
+        ))}
+        {adjusted.map((m) => (
+          <Line key={`aj-${m.userId}`} minus label={`Ajuste · ${m.displayName}`} amount={m.ajuste} />
+        ))}
         {fixedRoles.map((r) => (
           <Line
             key={r.roleId}
@@ -150,6 +160,9 @@ export function RepartoSection({
         <div className="border-t border-line pt-2">
           <Line label="A repartir" amount={result.remainder} strong />
         </div>
+        {equalMembers.length > 0 && (
+          <Line label={`Partes iguales · ${equalMembers.map((m) => m.displayName).join(", ")}`} amount={result.remainder} />
+        )}
         {percentRoles.map((r) => (
           <Line
             key={r.roleId}
@@ -178,12 +191,22 @@ export function RepartoSection({
           <thead>
             <tr className="text-[12px]/[16px] font-medium text-ink-muted">
               <th className="py-2 pr-3 font-medium">Persona</th>
-              <th className="py-2 pr-3 font-medium">Rol</th>
+              <th className="py-2 pr-3 font-medium">{payout.members ? "Regla" : "Rol"}</th>
               <th className="py-2 text-right font-medium">Parte</th>
             </tr>
           </thead>
           <tbody>
-            {payout.roles.flatMap((r) =>
+            {members.map((m) => (
+              <tr key={m.userId} className="border-t border-line">
+                <td className="py-2 pr-3">{m.displayName}</td>
+                <td className="py-2 pr-3 text-ink-muted">
+                  {m.rule.kind === "fixed" ? "Monto fijo" : "Parte igual"}
+                  {m.ajuste !== 0 && ` · ajuste ${m.ajuste > 0 ? "+" : ""}${formatGuaranies(m.ajuste)}`}
+                </td>
+                <td className="py-2 text-right font-mono text-[13px]">{formatGuaranies(m.amount)}</td>
+              </tr>
+            ))}
+            {legacyRoles.flatMap((r) =>
               r.attendees.map((a) => (
                 <tr key={a.userId} className="border-t border-line">
                   <td className="py-2 pr-3">{a.displayName}</td>
@@ -226,18 +249,20 @@ export function RepartoSection({
 
       {split && (
         <details className="border-t border-line pt-3">
-          <summary className="cursor-pointer text-[14px]/[20px] font-medium">Reparto de este evento</summary>
-          <div className="mt-3">
-            <SplitEditor
-              key={JSON.stringify(split.rules)}
-              projectId={projectId}
-              eventId={eventId}
-              roles={split.roles}
-              rules={split.rules}
-              submitLabel="Guardar para este evento"
-            >
-              {payout.source === "event" && <UseDefaultSplitButton projectId={projectId} eventId={eventId} />}
-            </SplitEditor>
+          <summary className="cursor-pointer text-[14px]/[20px] font-medium">Reglas de este evento</summary>
+          <div className="mt-3 flex flex-col">
+            <p className="m-0 pb-3 text-[12px]/[16px] text-ink-muted">
+              Cada miembro cobra una parte igual o un monto fijo; el ajuste se suma a su parte solo en este evento. Los
+              montos fijos y ajustes salen primero del neto y el resto se divide en partes iguales.
+            </p>
+            {split.map((member) => (
+              <EventMemberRowForm
+                key={`${member.userId}-${JSON.stringify([member.override, member.ajuste])}`}
+                projectId={projectId}
+                eventId={eventId}
+                member={member}
+              />
+            ))}
           </div>
         </details>
       )}
