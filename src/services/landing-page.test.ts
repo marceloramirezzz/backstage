@@ -8,6 +8,7 @@ import {
   getLandingContent,
   getLandingProfile,
   getLandingSettings,
+  getMyPublicProfile,
   getPublicLanding,
   saveLandingAlbum,
   saveLandingAudio,
@@ -15,6 +16,7 @@ import {
   saveLandingProfile,
   saveLandingSettings,
   saveLandingVideos,
+  saveMyPublicProfile,
 } from "./landing-page.ts";
 import { createProject } from "./projects.ts";
 import { listRoles } from "./roles.ts";
@@ -127,6 +129,77 @@ describe("Landing page", () => {
     await acceptInvitation(db.pool, member, invitation.id);
     return { ...b, member };
   }
+
+  describe("Member public profile", () => {
+    const optIn = { publicName: "Marce", publicBio: "Bajista", showOnAbout: true };
+
+    it("is private and empty by default", async () => {
+      const b = await adminAndMember("pp-default");
+      await saveLandingSettings(db.pool, b.owner, b.project.id, { enabled: true, slug: "pp-default" });
+      assert.deepEqual(await getMyPublicProfile(db.pool, b.member, b.project.id), {
+        publicName: null, publicBio: null, showOnAbout: false,
+      });
+      assert.deepEqual((await getPublicLanding(db.pool, "pp-default", "2026-10-02"))?.members, []);
+    });
+
+    it("shows an opted-in Member by public name and bio, and nobody else", async () => {
+      const b = await adminAndMember("pp-show");
+      await saveLandingSettings(db.pool, b.owner, b.project.id, { enabled: true, slug: "pp-show" });
+      await saveMyPublicProfile(db.pool, b.member, b.project.id, optIn);
+      // The Owner wrote a name but didn't opt in.
+      await saveMyPublicProfile(db.pool, b.owner, b.project.id, { publicName: "Dueño", publicBio: null, showOnAbout: false });
+      const page = await getPublicLanding(db.pool, "pp-show", "2026-10-02");
+      assert.deepEqual(page?.members, [{ name: "Marce", bio: "Bajista" }]);
+    });
+
+    it("removes a Member at once on opting out, keeping their text", async () => {
+      const b = await adminAndMember("pp-out");
+      await saveLandingSettings(db.pool, b.owner, b.project.id, { enabled: true, slug: "pp-out" });
+      await saveMyPublicProfile(db.pool, b.member, b.project.id, optIn);
+      await saveMyPublicProfile(db.pool, b.member, b.project.id, { ...optIn, showOnAbout: false });
+      assert.deepEqual((await getPublicLanding(db.pool, "pp-out", "2026-10-02"))?.members, []);
+      assert.deepEqual(await getMyPublicProfile(db.pool, b.member, b.project.id), { ...optIn, showOnAbout: false });
+    });
+
+    it("lets an Admin edit only their own, never another Member's", async () => {
+      const b = await adminAndMember("pp-own");
+      await saveMyPublicProfile(db.pool, b.owner, b.project.id, { publicName: "Admin", publicBio: null, showOnAbout: false });
+      assert.deepEqual(await getMyPublicProfile(db.pool, b.member, b.project.id), {
+        publicName: null, publicBio: null, showOnAbout: false,
+      });
+    });
+
+    it("needs a public name to opt in, and limits lengths", async () => {
+      const b = await adminAndMember("pp-valid");
+      await assert.rejects(
+        saveMyPublicProfile(db.pool, b.member, b.project.id, { publicName: "  ", publicBio: null, showOnAbout: true }),
+        { code: "invalid_input" },
+      );
+      await assert.rejects(
+        saveMyPublicProfile(db.pool, b.member, b.project.id, { publicName: "x".repeat(81), publicBio: null, showOnAbout: false }),
+        { code: "invalid_input" },
+      );
+      await assert.rejects(
+        saveMyPublicProfile(db.pool, b.member, b.project.id, { publicName: "x", publicBio: "y".repeat(601), showOnAbout: false }),
+        { code: "invalid_input" },
+      );
+    });
+
+    it("is for Members only", async () => {
+      const b = await adminAndMember("pp-outsider");
+      const outsider = await verifiedUser(db, "pp-outsider-x@example.com");
+      await assert.rejects(getMyPublicProfile(db.pool, outsider, b.project.id), { code: "not_found" });
+      await assert.rejects(saveMyPublicProfile(db.pool, outsider, b.project.id, optIn), { code: "not_found" });
+    });
+
+    it("never shows another Banda's Members", async () => {
+      const a = await adminAndMember("pp-mix-a");
+      const c = await adminAndMember("pp-mix-b");
+      await saveLandingSettings(db.pool, c.owner, c.project.id, { enabled: true, slug: "pp-mix-b" });
+      await saveMyPublicProfile(db.pool, a.member, a.project.id, optIn);
+      assert.deepEqual((await getPublicLanding(db.pool, "pp-mix-b", "2026-10-02"))?.members, []);
+    });
+  });
 
   describe("album", () => {
     const photo = (n: number, caption: string | null = null) => ({ url: `https://img.example/${n}.jpg`, caption });

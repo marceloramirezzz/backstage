@@ -19,6 +19,7 @@ import {
 } from "@/services/invitations.ts";
 import { deleteProject, leaveProject, removeMember, transferOwnership } from "@/services/members.ts";
 import { ROLE_TOGGLES, type RoleToggles } from "@/services/permissions.ts";
+import { MAX_PUBLIC_BIO_LENGTH, MAX_PUBLIC_NAME_LENGTH, saveMyPublicProfile } from "@/services/landing-page.ts";
 import { getProject } from "@/services/projects.ts";
 import { changeMemberRole, createRole, deleteRole, listRoles, updateRole, type Role } from "@/services/roles.ts";
 
@@ -292,4 +293,25 @@ export async function deleteRoleAction(projectId: string, roleId: string): Promi
   }
   refresh();
   return {};
+}
+
+const PUBLIC_PROFILE_MESSAGES: ErrorMessages = {
+  not_found: "Esta banda ya no existe.",
+  invalid_input: `Para aparecer en la página necesitás un nombre; el nombre admite hasta ${MAX_PUBLIC_NAME_LENGTH} caracteres y la bio ${MAX_PUBLIC_BIO_LENGTH}.`,
+};
+
+// The acting Member's own entry in the Landing page's About section.
+export async function savePublicProfile(prev: FormState, form: FormData): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await saveMyPublicProfile(getPool(), user, text(form, "projectId"), {
+      publicName: text(form, "publicName"),
+      publicBio: text(form, "publicBio"),
+      showOnAbout: form.get("showOnAbout") === "on",
+    });
+    refresh();
+    return { done: prev.done + 1 };
+  } catch (err) {
+    return { ...prev, error: errorMessage(err, PUBLIC_PROFILE_MESSAGES) };
+  }
 }

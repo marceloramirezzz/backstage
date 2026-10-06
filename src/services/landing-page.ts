@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import type { User } from "./accounts.ts";
 import { ServiceError, UNIQUE_VIOLATION, isViolation } from "./errors.ts";
-import { requirePermission } from "./permissions.ts";
+import { getPermissions, requirePermission } from "./permissions.ts";
 import type { Intensity } from "./songs.ts";
 import { CONTACT_PLATFORMS, isValidContactValue, type ContactPlatform } from "../lib/contact-link.ts";
 import { LANDING_SERVICE_IDS, isLandingService } from "../lib/landing-services.ts";
@@ -348,6 +348,58 @@ export async function saveLandingContacts(
   return clean;
 }
 
+// A Member's own entry in the About section.
+export interface MemberPublicProfile {
+  publicName: string | null;
+  publicBio: string | null;
+  showOnAbout: boolean;
+}
+
+export const MAX_PUBLIC_NAME_LENGTH = 80;
+export const MAX_PUBLIC_BIO_LENGTH = 600;
+
+// The acting Member's own public name, bio and opt-in. Members only.
+export async function getMyPublicProfile(
+  pool: Pool,
+  user: User,
+  projectId: string,
+): Promise<MemberPublicProfile> {
+  await getPermissions(pool, user, projectId); // Members only
+  const { rows } = await pool.query<MemberPublicProfile>(
+    `SELECT public_name AS "publicName", public_bio AS "publicBio", show_on_about AS "showOnAbout"
+     FROM memberships WHERE project_id = $1 AND user_id = $2`,
+    [projectId, user.id],
+  );
+  return rows[0];
+}
+
+// Replaces the acting Member's public name, bio and opt-in; a blank field
+// clears it. Edits are live. Only the Member edits their own entry (Admins
+// can't opt anyone in), and opting in needs a public name. Opting out hides
+// the entry at once but keeps the text.
+export async function saveMyPublicProfile(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  input: MemberPublicProfile,
+): Promise<MemberPublicProfile> {
+  await getPermissions(pool, user, projectId); // Members only
+  const clean: MemberPublicProfile = {
+    publicName: optionalText(input.publicName, MAX_PUBLIC_NAME_LENGTH, "A public name"),
+    publicBio: optionalText(input.publicBio, MAX_PUBLIC_BIO_LENGTH, "A bio"),
+    showOnAbout: input.showOnAbout,
+  };
+  if (clean.showOnAbout && !clean.publicName) {
+    throw new ServiceError("invalid_input", "Choose a public name to appear on the page");
+  }
+  await pool.query(
+    `UPDATE memberships SET public_name = $3, public_bio = $4, show_on_about = $5, updated_at = now()
+     WHERE project_id = $1 AND user_id = $2`,
+    [projectId, user.id, clean.publicName, clean.publicBio, clean.showOnAbout],
+  );
+  return clean;
+}
+
 export interface PublicAppearance {
   name: string;
   // YYYY-MM-DD
@@ -370,6 +422,8 @@ export interface PublicLanding {
   // Contact links, in order.
   contacts: LandingContact[];
   profile: LandingProfile;
+  // Members who opted in, by public name.
+  members: { name: string; bio: string | null }[];
   audio: LandingMedia[];
   // Embeddable addresses, in order.
   videos: { embedUrl: string; title: string | null }[];
@@ -398,6 +452,7 @@ export async function getPublicLanding(
     { rows: profiles },
     { rows: audio },
     { rows: videos },
+    { rows: members },
   ] = await Promise.all([
     pool.query<PublicLanding["repertoire"][number]>(
       `SELECT name, intensity FROM (
@@ -419,6 +474,12 @@ export async function getPublicLanding(
     pool.query<LandingProfile>(PROFILE_SQL, [page.projectId]),
     pool.query<LandingMedia>(AUDIO_SQL, [page.projectId]),
     pool.query<LandingMedia>(VIDEOS_SQL, [page.projectId]),
+    pool.query<PublicLanding["members"][number]>(
+      `SELECT public_name AS name, public_bio AS bio FROM memberships
+       WHERE project_id = $1 AND show_on_about
+       ORDER BY lower(unaccent(public_name)), created_at`,
+      [page.projectId],
+    ),
   ]);
   const appearances = events.map((e) => ({ ...e, upcoming: e.date >= today }));
   return {
@@ -431,6 +492,7 @@ export async function getPublicLanding(
     photos,
     contacts,
     profile: profiles[0] ?? EMPTY_PROFILE,
+    members,
     audio,
     videos: videos.flatMap(({ url, title }) => {
       const ref = parseVideoUrl(url);

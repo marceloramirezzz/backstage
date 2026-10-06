@@ -101,7 +101,7 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
   if (!page) notFound();
   const { profile } = page;
   const services = profile.services.filter(isLandingService);
-  const hasAbout = Boolean(profile.about || profile.yearsActive !== null || profile.travelArea);
+  const hasAbout = Boolean(profile.about || page.members.length > 0 || profile.yearsActive !== null || profile.travelArea);
   const nav = [
     ["shows", "Shows", true],
     ["repertorio", "Repertorio", true],
@@ -214,6 +214,16 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
                 </dl>
               )}
               {profile.about && <p className="m-0 whitespace-pre-line text-[16px]/[26px]">{profile.about}</p>}
+              {page.members.length > 0 && (
+                <ul className="m-0 grid list-none grid-cols-2 gap-x-8 gap-y-5 p-0 max-sm:grid-cols-1">
+                  {page.members.map((m, i) => (
+                    <li key={`${i}-${m.name}`} className="m-0 flex flex-col gap-1">
+                      <span className="text-[18px]/[24px] font-medium">{m.name}</span>
+                      {m.bio && <span className="whitespace-pre-line text-[14px]/[22px] text-ink-muted">{m.bio}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </section>
         )}
