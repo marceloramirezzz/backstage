@@ -1,8 +1,17 @@
-// One email: plain text, one recipient.
+export interface EmailAttachment {
+  filename: string;
+  // e.g. `text/calendar; method=REQUEST`
+  contentType: string;
+  // Text, sent as it is.
+  content: string;
+}
+
+// One email: plain text, one recipient, optionally with attachments.
 export interface EmailMessage {
   to: string;
   subject: string;
   body: string;
+  attachments?: EmailAttachment[];
 }
 
 // Sends email. Resend backs it in production, the console in development and
@@ -17,8 +26,9 @@ export interface Mailer {
 export function consoleMailer(appUrl: string): Mailer {
   return {
     appUrl,
-    async send({ to, subject, body }) {
-      console.log(`\n--- Email to ${to}: ${subject}\n${body}\n---\n`);
+    async send({ to, subject, body, attachments = [] }) {
+      const files = attachments.map((a) => `\n[Attachment ${a.filename}]\n${a.content}`).join("");
+      console.log(`\n--- Email to ${to}: ${subject}\n${body}${files}\n---\n`);
     },
   };
 }
@@ -27,11 +37,23 @@ export function consoleMailer(appUrl: string): Mailer {
 export function resendMailer(appUrl: string, apiKey: string, from: string): Mailer {
   return {
     appUrl,
-    async send({ to, subject, body }) {
+    async send({ to, subject, body, attachments }) {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, subject, text: body }),
+        body: JSON.stringify({
+          from,
+          to,
+          subject,
+          text: body,
+          ...(attachments && {
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              content: Buffer.from(a.content).toString("base64"),
+              content_type: a.contentType,
+            })),
+          }),
+        }),
       });
       if (!response.ok) {
         throw new Error(`Resend refused the email (${response.status}): ${await response.text()}`);

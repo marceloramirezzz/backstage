@@ -11,6 +11,7 @@ describe("event notification email", () => {
       name: "Fiesta",
       date: "2027-05-01",
       startTime: "21:30",
+      durationMinutes: 180,
       location: "Club Centenario",
     });
     assert.equal(message.to, "ana@example.com");
@@ -21,11 +22,31 @@ describe("event notification email", () => {
     assert.match(message.body, /https:\/\/backstage\.test\/p\/p1\/eventos\/e1/);
   });
 
+  it("attaches an invite with the Event's stable identifier", () => {
+    const message = eventNotificationEmail(
+      mailer,
+      "ana@example.com",
+      "Los Tigres",
+      "p1",
+      "e1",
+      { name: "Fiesta", date: "2027-05-01", startTime: "21:30", durationMinutes: 180, location: "Club Centenario" },
+      new Date("2026-10-06T12:00:00Z"),
+    );
+    const [invite] = message.attachments!;
+    assert.match(invite.contentType, /^text\/calendar.*method=REQUEST/);
+    assert.match(invite.content, /METHOD:REQUEST/);
+    assert.match(invite.content, /UID:event-e1@backstage/);
+    assert.match(invite.content, /SUMMARY:Fiesta/);
+    assert.match(invite.content, /DTSTART:20270501T213000/);
+    assert.match(invite.content, /DTEND:20270502T003000/);
+  });
+
   it("says so when the time or the location isn't settled", () => {
     const message = eventNotificationEmail(mailer, "ana@example.com", "Los Tigres", "p1", "e1", {
       name: "Fiesta",
       date: "2027-05-01",
       startTime: null,
+      durationMinutes: 180,
       location: null,
     });
     assert.match(message.body, /Hora: Sin definir/);
