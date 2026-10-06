@@ -81,9 +81,7 @@ export default async function EventPage({
           </h1>
           <p className="m-0 flex flex-wrap items-center gap-2 text-[14px]/[20px] text-ink-muted">
             <StatusLabel status={event.status} />
-            {[formatLongDate(event.date), event.location]
-              .filter(Boolean)
-              .join(" · ")}
+            {event.location}
           </p>
           {bookingRequestId && (
             <Link href={`/p/${projectId}/solicitudes/${bookingRequestId}`} className="text-[13px]/[18px] underline">

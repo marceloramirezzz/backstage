@@ -46,7 +46,7 @@ export function ExpensesSection({
       className="flex flex-col gap-3 rounded-lg border border-line bg-bg-1 p-3"
     >
       <h2 id="gastos-title" className="m-0 text-[12px]/[16px] font-semibold uppercase tracking-wide text-ink-muted">
-        Cachet y gastos
+        Gastos
       </h2>
       {expenses.length ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
