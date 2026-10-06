@@ -51,7 +51,7 @@ The sidebar and top bar are shared layout: build them once in the Project layout
 - Event status colors map 1:1 to `pending / confirmed / paid / cancelled`, and always show icon + word.
 - Money: Guaraníes, `Gs. 4.500.000` (dot thousands), mono font; compact `Gs. 18,2M` only on stat tiles. Times 24h with en dash.
 - Permissions are visible in the UI: hide pay/expenses from roles without "see total pay & expenses"; only Admins ever see other members' splits (the Members screen shows that toggle locked).
-- Payout split is computed on net pay (ADR 0001); the Event screen shows the math: pay − expenses = net, fixed amounts first, then percentages among those who played.
+- Payout split is computed on net pay (ADR 0001); the Event screen shows the math: pay − expenses = net, fixed amounts first, then equal shares among those who played (ADR 0003).
 - Text contrast ≥ 4.5:1 in both themes (already true for the tokens); focus ring is a 2px `focus-ring` outline, offset 2px.
 - Sentence case everywhere; no emoji.
 

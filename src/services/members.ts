@@ -116,8 +116,8 @@ export async function deleteProject(
       throw new ServiceError("invalid_input", "Type the Project's name to delete it");
     }
     // Children before parents, for the tables without a cascade. Events take
-    // their Attendance, Expenses, Setlist copies, Splits and snapshots with
-    // them; Setlists their items; Roles the default Split.
+    // their Attendance, Expenses, Setlist copies, member settings and snapshots
+    // with them; Setlists their items.
     for (const table of ["events", "setlists", "selections", "songs", "invitations"]) {
       await client.query(`DELETE FROM ${table} WHERE project_id = $1`, [projectId]);
     }
