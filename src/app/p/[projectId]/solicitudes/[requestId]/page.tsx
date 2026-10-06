@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { buttonClass } from "@/components/ui/button.tsx";
 import { getPool } from "@/db/pool.ts";
 import { BOOKING_STATUS_LABELS, EVENT_TYPE_LABELS, URGENCY_LABELS } from "@/lib/booking.ts";
 import { requireUser } from "@/lib/session.ts";
@@ -25,7 +26,8 @@ export default async function BookingRequestDetail({
     throw err;
   });
 
-  const canConvert = (await getPermissions(pool, user, projectId)).editRepertoireSetlistsEvents;
+  const permissions = await getPermissions(pool, user, projectId);
+  const canConvert = permissions.editRepertoireSetlistsEvents;
   const notes = await listBookingNotes(pool, user, projectId, requestId);
 
   const rows: [string, string | null][] = [
@@ -83,6 +85,33 @@ export default async function BookingRequestDetail({
           </p>
         )}
       </section>
+      {permissions.seeTotalPayExpenses && (
+        <section className="flex max-w-[640px] flex-col gap-3">
+          <h2 className="m-0 text-[18px]/[24px] font-semibold">Cotización</h2>
+          <form
+            method="get"
+            action={`/p/${projectId}/documentos/cotizacion`}
+            className="flex flex-wrap items-end gap-2 text-[14px]/[20px]"
+          >
+            <input type="hidden" name="solicitud" value={requestId} />
+            <label className="flex flex-col gap-1">
+              Monto (Gs.)
+              <input
+                name="monto"
+                type="number"
+                min={1}
+                step={1}
+                required
+                inputMode="numeric"
+                className="h-9 rounded-md border border-line-control bg-transparent px-2"
+              />
+            </label>
+            <button type="submit" className={buttonClass()}>
+              Descargar PDF
+            </button>
+          </form>
+        </section>
+      )}
       <section aria-labelledby="notas-title" className="flex max-w-[640px] flex-col gap-3">
         <h2 id="notas-title" className="m-0 text-[18px]/[24px] font-semibold">
           Notas internas

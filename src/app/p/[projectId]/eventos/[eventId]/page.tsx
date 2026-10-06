@@ -88,6 +88,11 @@ export default async function EventPage({
               Ver la solicitud
             </Link>
           )}
+          {permissions.manageBookings && permissions.seeTotalPayExpenses && (event.pay ?? 0) > 0 && (
+            <a href={`/p/${projectId}/documentos/cotizacion?evento=${event.id}`} className="text-[13px]/[18px] underline">
+              Descargar cotización (PDF)
+            </a>
+          )}
         </div>
         {canEdit && (
           <div className="ml-auto flex flex-col items-end gap-2">
