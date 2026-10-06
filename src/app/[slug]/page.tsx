@@ -9,6 +9,7 @@ import { iconProps } from "@/components/ui/icon-props.ts";
 import { getPool } from "@/db/pool.ts";
 import { todayIn } from "@/lib/format.ts";
 import { initials } from "@/lib/initials.ts";
+import { LANDING_SERVICES, isLandingService } from "@/lib/landing-services.ts";
 import { CONTACT_LABELS } from "@/lib/contact-label.ts";
 import { contactHref, type ContactPlatform } from "@/lib/contact-link.ts";
 import { getPublicLanding, type LandingContact, type PublicAppearance } from "@/services/landing-page.ts";
@@ -98,6 +99,19 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
   const page = await loadLanding(slug);
   if (!page) notFound();
+  const { profile } = page;
+  const services = profile.services.filter(isLandingService);
+  const hasAbout = Boolean(profile.about || profile.yearsActive !== null || profile.travelArea);
+  const nav = [
+    ["shows", "Shows", true],
+    ["repertorio", "Repertorio", true],
+    ["servicios", "Servicios", services.length > 0],
+    ["nosotros", "Sobre nosotros", hasAbout],
+    ["audio", "Audio", page.audio.length > 0],
+    ["videos", "Videos", page.videos.length > 0],
+    ["fotos", "Fotos", page.photos.length > 0],
+    ["contratanos", "Contratanos", true],
+  ] as const;
 
   return (
     <div className="min-h-screen bg-bg-0 text-ink">
@@ -112,9 +126,24 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
             </span>
             {page.name}
           </span>
-          <h1 className="m-0 text-[72px]/[72px] font-semibold tracking-[-0.035em] max-sm:text-[44px]/[46px]">
-            {page.name}
-          </h1>
+          <div className="flex flex-col gap-4">
+            <h1 className="m-0 text-[72px]/[72px] font-semibold tracking-[-0.035em] max-sm:text-[44px]/[46px]">
+              {page.name}
+            </h1>
+            {profile.genre && (
+              <p className="m-0 font-mono text-[13px] uppercase tracking-[.08em] text-spotlight-ink">{profile.genre}</p>
+            )}
+            {profile.tagline && <p className="m-0 max-w-[720px] text-[24px]/[32px] text-ink-muted">{profile.tagline}</p>}
+          </div>
+          <nav aria-label="Secciones" className="flex flex-wrap gap-x-5 gap-y-2 text-[14px]">
+            {nav
+              .filter(([, , shown]) => shown)
+              .map(([id, label]) => (
+                <a key={id} href={`#${id}`} className="text-ink-muted no-underline hover:text-ink">
+                  {label}
+                </a>
+              ))}
+          </nav>
         </header>
 
         <section id="shows" className="flex flex-col">
@@ -148,6 +177,89 @@ export default async function LandingPage({ params }: PageProps<"/[slug]">) {
             <p className="m-0 text-ink-muted">Todavía no hay canciones.</p>
           )}
         </section>
+
+        {services.length > 0 && (
+          <section id="servicios" className="flex flex-col gap-4">
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Servicios</h2>
+            <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
+              {services.map((id) => (
+                <li key={id} className="m-0 rounded-pill border border-line-control px-5 py-2.5 text-[15px]">
+                  {LANDING_SERVICES[id]}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {hasAbout && (
+          <section id="nosotros" className="grid grid-cols-[320px_minmax(0,1fr)] gap-12 max-desktop:grid-cols-1 max-desktop:gap-6">
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Sobre nosotros</h2>
+            <div className="flex flex-col gap-5">
+              {(profile.yearsActive !== null || profile.travelArea) && (
+                <dl className="m-0 flex flex-wrap gap-x-10 gap-y-3">
+                  {profile.yearsActive !== null && (
+                    <div className="flex flex-col">
+                      <dt className="text-[12px] uppercase tracking-[.06em] text-ink-muted">Trayectoria</dt>
+                      <dd className="m-0 text-[18px]/[24px]">
+                        {profile.yearsActive === 1 ? "1 año" : `${profile.yearsActive} años`}
+                      </dd>
+                    </div>
+                  )}
+                  {profile.travelArea && (
+                    <div className="flex flex-col">
+                      <dt className="text-[12px] uppercase tracking-[.06em] text-ink-muted">Viajamos a</dt>
+                      <dd className="m-0 text-[18px]/[24px]">{profile.travelArea}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+              {profile.about && <p className="m-0 whitespace-pre-line text-[16px]/[26px]">{profile.about}</p>}
+            </div>
+          </section>
+        )}
+
+        {page.audio.length > 0 && (
+          <section id="audio" className="flex flex-col gap-4">
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Audio</h2>
+            <ul className="m-0 flex list-none flex-col p-0">
+              {page.audio.map((a, i) => (
+                <li key={`${i}-${a.url}`} className="m-0 border-t border-line py-3 last:border-b">
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-h-12 items-center gap-3 text-[16px] text-ink no-underline hover:text-spotlight-ink"
+                  >
+                    <Play {...iconProps} className="size-[18px] shrink-0" aria-hidden />
+                    <span className="min-w-0 break-words">{a.title ?? `Muestra ${i + 1}`}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {page.videos.length > 0 && (
+          <section id="videos" className="flex flex-col gap-4">
+            <h2 className="m-0 text-[32px]/[36px] font-semibold tracking-[-0.02em]">Videos</h2>
+            <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0 max-desktop:grid-cols-1">
+              {page.videos.map((v, i) => (
+                <li key={`${i}-${v.embedUrl}`} className="m-0 flex flex-col gap-2">
+                  <iframe
+                    src={v.embedUrl}
+                    title={v.title ?? `Video ${i + 1}`}
+                    loading="lazy"
+                    allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    className="aspect-video w-full rounded-lg border border-line bg-bg-2"
+                  />
+                  {v.title && <span className="text-[13px]/[18px] text-ink-muted">{v.title}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {page.photos.length > 0 && (
           <section id="fotos" className="flex flex-col gap-4">

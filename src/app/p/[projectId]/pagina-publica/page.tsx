@@ -7,17 +7,29 @@ import { requestOrigin } from "@/lib/origin.ts";
 import { requireUser } from "@/lib/session.ts";
 import {
   getLandingContent,
+  getLandingProfile,
   getLandingSettings,
+  MAX_ABOUT_LENGTH,
+  MAX_AUDIO,
   MAX_CAPTION_LENGTH,
   MAX_CONTACT_LABEL_LENGTH,
   MAX_CONTACT_VALUE_LENGTH,
   MAX_CONTACTS,
+  MAX_GENRE_LENGTH,
   MAX_PHOTOS,
+  MAX_TAGLINE_LENGTH,
+  MAX_TITLE_LENGTH,
+  MAX_TRAVEL_AREA_LENGTH,
+  MAX_VIDEOS,
+  MAX_YEARS_ACTIVE,
 } from "@/services/landing-page.ts";
 import { getPermissions } from "@/services/permissions.ts";
+import { saveAudio, saveVideos } from "./actions.ts";
 import { AlbumForm } from "./album-form.tsx";
 import { ContactsForm } from "./contacts-form.tsx";
 import { LandingForm } from "./landing-form.tsx";
+import { MediaForm } from "./media-form.tsx";
+import { ProfileForm } from "./profile-form.tsx";
 
 export const metadata: Metadata = { title: "Página pública · Backstage" };
 
@@ -29,9 +41,10 @@ export default async function PublicPageSettings({
   const { projectId } = await params;
   const pool = getPool();
   if (!(await getPermissions(pool, user, projectId)).administer) notFound();
-  const [settings, content] = await Promise.all([
+  const [settings, content, profile] = await Promise.all([
     getLandingSettings(pool, user, projectId),
     getLandingContent(pool, user, projectId),
+    getLandingProfile(pool, user, projectId),
   ]);
   const origin = await requestOrigin();
 
@@ -61,6 +74,57 @@ export default async function PublicPageSettings({
           enabled={settings.enabled}
           slug={settings.slug ?? ""}
           origin={origin}
+        />
+      </section>
+      <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-bg-2 p-4">
+        <h2 className="m-0 text-[18px]/[24px] font-semibold">Presentación</h2>
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">
+          Cada sección aparece en la página solo si tiene contenido.
+        </p>
+        <ProfileForm
+          projectId={projectId}
+          profile={profile}
+          limits={{
+            tagline: MAX_TAGLINE_LENGTH,
+            genre: MAX_GENRE_LENGTH,
+            travelArea: MAX_TRAVEL_AREA_LENGTH,
+            about: MAX_ABOUT_LENGTH,
+            years: MAX_YEARS_ACTIVE,
+          }}
+        />
+      </section>
+      <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-bg-2 p-4">
+        <h2 className="m-0 text-[18px]/[24px] font-semibold">Audio</h2>
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">Enlaces https a muestras de audio, en este orden.</p>
+        <MediaForm
+          projectId={projectId}
+          items={content.audio}
+          save={saveAudio}
+          max={MAX_AUDIO}
+          maxTitle={MAX_TITLE_LENGTH}
+          rowKey="audio"
+          empty="Todavía no hay audios."
+          addLabel="Agregar audio"
+          urlLabel="Dirección del audio"
+          urlPlaceholder="https://…"
+        />
+      </section>
+      <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-bg-2 p-4">
+        <h2 className="m-0 text-[18px]/[24px] font-semibold">Videos</h2>
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">
+          Enlaces de YouTube o Vimeo; se muestran incrustados. Otros sitios no se aceptan.
+        </p>
+        <MediaForm
+          projectId={projectId}
+          items={content.videos}
+          save={saveVideos}
+          max={MAX_VIDEOS}
+          maxTitle={MAX_TITLE_LENGTH}
+          rowKey="video"
+          empty="Todavía no hay videos."
+          addLabel="Agregar video"
+          urlLabel="Enlace de YouTube o Vimeo"
+          urlPlaceholder="https://youtu.be/…"
         />
       </section>
       <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-bg-2 p-4">
