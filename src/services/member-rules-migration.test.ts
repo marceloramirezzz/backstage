@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import pg from "pg";
 import { migrate } from "../db/migrate.ts";
@@ -39,7 +40,7 @@ const legacyPayload = (userId: string) => ({
   attendance: [],
 });
 
-describe("migration 022: per-Member payout rules", () => {
+describe("migrations 022 and 023: per-Member payout rules replace Role-based ones", () => {
   let db: TestDb;
   before(async () => {
     db = await createTestDb();
@@ -70,7 +71,8 @@ describe("migration 022: per-Member payout rules", () => {
     await db.pool.query(`
       DROP TABLE member_split_defaults, event_member_settings;
       DROP TYPE member_rule_kind;
-      DELETE FROM schema_migrations WHERE filename LIKE '022%'`);
+      DELETE FROM schema_migrations WHERE filename LIKE '022%' OR filename LIKE '023%'`);
+    await db.pool.query(readFileSync(new URL("../../migrations/013_create_payout_splits.sql", import.meta.url), "utf8"));
     const pid = project.id;
     await db.pool.query(
       `INSERT INTO project_split_rules (project_id, role_id, kind, value) VALUES
@@ -97,6 +99,13 @@ describe("migration 022: per-Member payout rules", () => {
     } finally {
       await client.end();
     }
+
+    // 023 removed the Role-based tables once 022 had converted them.
+    const { rows: leftovers } = await db.pool.query(
+      `SELECT to_regclass('project_split_rules') AS a, to_regclass('event_splits') AS b,
+         to_regclass('event_split_rules') AS c, to_regtype('split_kind') AS d`,
+    );
+    assert.deepEqual(leftovers[0], { a: null, b: null, c: null, d: null });
 
     const defaults = Object.fromEntries((await getMemberRules(db.pool, owner, pid)).map((r) => [r.userId, r.rule]));
     assert.deepEqual(defaults[sofia.id], { kind: "fixed", value: 300_000 });

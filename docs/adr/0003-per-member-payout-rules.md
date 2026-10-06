@@ -13,3 +13,5 @@ Percentage splits are dropped on purpose. Reintroducing them later is possible b
 This is hard to reverse because existing Projects hold Role-based defaults and Event overrides. A migration converts each Role's fixed-per-Member rule to a Member fixed default and everything else to Equal share. Paid Events keep their frozen snapshots untouched, so past payouts never change meaning. A reader seeing only Roles and Members in the schema would not guess that Roles are irrelevant to the split, hence recording it here.
 
 Related: the split still runs on net pay and still sets aside the band fund first (see ADR 0001). There is no record of whether a Member has actually been paid their share.
+
+The Role-based tables and code were removed once nothing depended on them (migration 023). Frozen Paid snapshots written under the old model keep their Role-based JSON and still render from it.
