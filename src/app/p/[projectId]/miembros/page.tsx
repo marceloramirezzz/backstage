@@ -3,6 +3,11 @@ import { getPool } from "@/db/pool.ts";
 import { roleLabel } from "@/lib/role-label.ts";
 import { requireUser } from "@/lib/session.ts";
 import { listInvitations } from "@/services/invitations.ts";
+import {
+  getMyPublicProfile,
+  MAX_PUBLIC_BIO_LENGTH,
+  MAX_PUBLIC_NAME_LENGTH,
+} from "@/services/landing-page.ts";
 import { listMembers } from "@/services/members.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { getProject } from "@/services/projects.ts";
@@ -10,6 +15,7 @@ import { listRoles } from "@/services/roles.ts";
 import { BandActions } from "./band-actions.tsx";
 import { InvitationList, InviteButton } from "./invitations.tsx";
 import { MembersList } from "./members-list.tsx";
+import { PublicProfileForm } from "./public-profile-form.tsx";
 import { RolesEditor } from "./roles.tsx";
 
 export const metadata: Metadata = { title: "Miembros · Backstage" };
@@ -41,11 +47,12 @@ export default async function MembersPage({ params }: PageProps<"/p/[projectId]/
   const user = await requireUser();
   const { projectId } = await params;
   const pool = getPool();
-  const [project, permissions, members, roles] = await Promise.all([
+  const [project, permissions, members, roles, publicProfile] = await Promise.all([
     getProject(pool, user, projectId),
     getPermissions(pool, user, projectId),
     listMembers(pool, user, projectId),
     listRoles(pool, user, projectId),
+    getMyPublicProfile(pool, user, projectId),
   ]);
   const now = new Date();
   const invitations = permissions.administer ? await listInvitations(pool, user, projectId, now) : [];
@@ -104,6 +111,13 @@ export default async function MembersPage({ params }: PageProps<"/p/[projectId]/
               />
             </Card>
           )}
+          <Card title="Tu perfil público">
+            <PublicProfileForm
+              projectId={projectId}
+              profile={publicProfile}
+              limits={{ name: MAX_PUBLIC_NAME_LENGTH, bio: MAX_PUBLIC_BIO_LENGTH }}
+            />
+          </Card>
           <Card title="Tu lugar en la banda">
             <BandActions
               projectId={projectId}
