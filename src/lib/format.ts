@@ -71,3 +71,16 @@ export const formatShortDate = (iso: string) =>
   new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "short", timeZone: DEFAULT_TIME_ZONE })
     .format(new Date(iso))
     .replace(".", "");
+
+// `2 oct, 14:30`: a moment's day and time in the Project's time zone.
+export const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat("es-PY", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: DEFAULT_TIME_ZONE,
+  })
+    .format(new Date(iso))
+    .replace(".", "");
