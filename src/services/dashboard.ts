@@ -12,9 +12,9 @@ export interface BandDashboard {
   shows: number;
   paidShows: number;
   confirmedShows: number;
-  // `pay` of Paid Events.
+  // Payments received dated within the period.
   earned: number;
-  // `pay` of Confirmed Events not yet Paid.
+  // `pay` minus Payments received, for Confirmed and Paid Events.
   expected: number;
 }
 
@@ -49,14 +49,24 @@ export async function getDashboard(
   const confirmed = events.filter((e) => e.status === "confirmed");
 
   if (permissions.seeTotalPayExpenses) {
-    const sum = (list: typeof events) => list.reduce((total, e) => total + e.pay, 0);
+    const { rows } = await pool.query<{ earned: number; expected: number }>(
+      `SELECT
+         (SELECT COALESCE(SUM(p.amount), 0)::float8 FROM event_payments p
+          JOIN events e ON e.id = p.event_id
+          WHERE e.project_id = $1 AND p.date BETWEEN $2 AND $3) AS earned,
+         (SELECT COALESCE(SUM(GREATEST(e.pay - COALESCE(r.received, 0), 0)), 0)::float8 FROM events e
+          LEFT JOIN (SELECT event_id, SUM(amount) AS received FROM event_payments GROUP BY event_id) r
+            ON r.event_id = e.id
+          WHERE e.project_id = $1 AND e.status IN ('confirmed', 'paid') AND e.date BETWEEN $2 AND $3) AS expected`,
+      [projectId, period.from, period.to],
+    );
     return {
       scope: "band",
       shows: events.length,
       paidShows: paid.length,
       confirmedShows: confirmed.length,
-      earned: sum(paid),
-      expected: sum(confirmed),
+      earned: rows[0].earned,
+      expected: rows[0].expected,
     };
   }
 

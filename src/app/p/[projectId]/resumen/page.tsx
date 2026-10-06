@@ -18,8 +18,6 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 
 const UPCOMING_LIMIT = 5;
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 // Shows, Cobrado and Por cobrar for a month or a year, then the next Eventos
 // whatever the period. A Rol that can't see
 // the total pay gets only its own amounts.
@@ -53,7 +51,7 @@ export default async function DashboardPage({
           <p className="m-0 text-[14px]/[20px] text-ink-muted">
             {own
               ? "Tu parte de los eventos pagados y de los confirmados que todavía no se pagaron."
-              : "Cobrado suma los eventos pagados; Por cobrar, los confirmados que todavía no se pagaron."}
+              : "Cobrado suma los pagos recibidos en el período; Por cobrar, lo que falta cobrar de los eventos confirmados y pagados."}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -85,13 +83,13 @@ export default async function DashboardPage({
           label="Cobrado"
           icon={<CircleDollarSign {...iconProps} />}
           value={formatGuaranies(dashboard.earned)}
-          foot={own ? "Tu parte" : plural(dashboard.paidShows, "evento pagado", "eventos pagados")}
+          foot={own ? "Tu parte" : `Pagos recibidos · ${label}`}
         />
         <StatTile
           label="Por cobrar"
           icon={<Clock {...iconProps} />}
           value={formatGuaranies(dashboard.expected)}
-          foot={own ? "Tu parte" : `${plural(dashboard.confirmedShows, "confirmado", "confirmados")}, esperando el pago`}
+          foot={own ? "Tu parte" : "Cachet menos pagos recibidos"}
         />
       </div>
 
