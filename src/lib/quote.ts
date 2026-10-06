@@ -2,7 +2,7 @@
 // wording and figures are tested apart from the layout.
 
 import { EVENT_TYPE_LABELS, type BookingEventType } from "./booking.ts";
-import { formatGuaranies } from "./format.ts";
+import { formatFullDate, formatGuaranies } from "./format.ts";
 
 export interface QuoteInput {
   bandName: string;
@@ -29,13 +29,6 @@ export interface QuoteModel {
   total: string;
   // `COT-0007`
   numberLabel: string;
-}
-
-// `26 de septiembre de 2026`
-function formatFullDate(date: string): string {
-  return new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(
-    new Date(`${date}T00:00:00Z`),
-  );
 }
 
 export const quoteNumberLabel = (number: number) => `COT-${String(number).padStart(4, "0")}`;
