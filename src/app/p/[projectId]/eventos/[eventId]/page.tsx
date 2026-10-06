@@ -10,7 +10,6 @@ import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { Tag } from "@/components/ui/tag.tsx";
 import { getPool } from "@/db/pool.ts";
 import { eventTimeRange, formatLongDate } from "@/lib/calendar.ts";
-import { todayIn } from "@/lib/format.ts";
 import {
   formatClock,
   formatDuration,
@@ -21,7 +20,6 @@ import { requireUser } from "@/lib/session.ts";
 import { ServiceError } from "@/services/errors.ts";
 import { getAttendance } from "@/services/attendance.ts";
 import { getExpenses } from "@/services/expenses.ts";
-import { getPayments } from "@/services/payments.ts";
 import { getEvent, type Event } from "@/services/events.ts";
 import { getEventBookingRequestId } from "@/services/booking-requests.ts";
 import { getPermissions } from "@/services/permissions.ts";
@@ -32,7 +30,6 @@ import { AttendanceSection } from "./attendance.tsx";
 import { EventControls } from "./event-controls.tsx";
 import { ExpensesSection } from "./expenses.tsx";
 import { NotifyAttendance } from "./notify-attendance.tsx";
-import { PaymentsSection } from "./payments.tsx";
 import { RepartoSection } from "./reparto.tsx";
 
 export const metadata: Metadata = { title: "Evento · Backstage" };
@@ -55,7 +52,6 @@ export default async function EventPage({
   const canEdit = permissions.editRepertoireSetlistsEvents;
   const attendance = await getAttendance(pool, user, projectId, eventId);
   const expenses = await getExpenses(pool, user, projectId, eventId);
-  const payments = await getPayments(pool, user, projectId, eventId);
   const payout = await getEventPayout(pool, user, projectId, eventId);
   const bookingRequestId = await getEventBookingRequestId(pool, user, projectId, eventId);
   const split = permissions.administer
@@ -122,15 +118,6 @@ export default async function EventPage({
             eventId={event.id}
             summary={expenses}
             canEdit={canEdit}
-          />
-        )}
-        {payments && (
-          <PaymentsSection
-            projectId={projectId}
-            eventId={event.id}
-            summary={payments}
-            canEdit={canEdit}
-            today={todayIn()}
           />
         )}
         <RepartoSection
