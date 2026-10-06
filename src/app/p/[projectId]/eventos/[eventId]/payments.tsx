@@ -62,7 +62,7 @@ export function PaymentsSection({
                       variant="ghost"
                       size="sm"
                       className="min-h-11 min-w-11 justify-center"
-                      aria-label={`Editar el pago del ${formatLongDate(p.date)}`}
+                      aria-label={`Editar el pago recibido del ${formatLongDate(p.date)}`}
                       onClick={() => setEditing(editing === p.id ? undefined : p.id)}
                     >
                       <Pencil {...iconProps} />
@@ -71,7 +71,7 @@ export function PaymentsSection({
                       variant="ghost"
                       size="sm"
                       className="min-h-11 min-w-11 justify-center"
-                      aria-label={`Quitar el pago del ${formatLongDate(p.date)}`}
+                      aria-label={`Quitar el pago recibido del ${formatLongDate(p.date)}`}
                       disabled={pending}
                       onClick={() =>
                         startTransition(async () =>
@@ -157,7 +157,7 @@ function PaymentForm({
           <Input name="note" autoComplete="off" defaultValue={payment?.note ?? ""} />
         </Field>
         <Button type="submit" variant="secondary" disabled={pending}>
-          {payment ? "Guardar" : <><Plus {...iconProps} />Agregar pago</>}
+          {payment ? "Guardar" : <><Plus {...iconProps} />Agregar pago recibido</>}
         </Button>
       </div>
       {state.error && <FormMessage tone="error">{state.error}</FormMessage>}
