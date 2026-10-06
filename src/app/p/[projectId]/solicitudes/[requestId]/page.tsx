@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { getPool } from "@/db/pool.ts";
 import { BOOKING_STATUS_LABELS, EVENT_TYPE_LABELS, URGENCY_LABELS } from "@/lib/booking.ts";
 import { requireUser } from "@/lib/session.ts";
-import { getBookingRequest } from "@/services/booking-requests.ts";
+import { formatDateTime } from "@/lib/format.ts";
+import { getBookingRequest, listBookingNotes } from "@/services/booking-requests.ts";
 import { ServiceError } from "@/services/errors.ts";
 import { getPermissions } from "@/services/permissions.ts";
+import { DeleteRequest, NoteForm, StatusPicker } from "../request-controls.tsx";
 
 export const metadata: Metadata = { title: "Solicitud · Backstage" };
 
@@ -22,6 +24,8 @@ export default async function BookingRequestDetail({
     if (err instanceof ServiceError && err.code === "not_found") notFound();
     throw err;
   });
+
+  const notes = await listBookingNotes(pool, user, projectId, requestId);
 
   const rows: [string, string | null][] = [
     ["Teléfono", request.phone],
@@ -59,6 +63,32 @@ export default async function BookingRequestDetail({
       <section className="flex max-w-[640px] flex-col gap-2">
         <h2 className="m-0 text-[18px]/[24px] font-semibold">Descripción</h2>
         <p className="m-0 whitespace-pre-wrap break-words text-[14px]/[20px]">{request.description}</p>
+      </section>
+      <section className="flex max-w-[640px] flex-col gap-3">
+        <h2 className="m-0 text-[18px]/[24px] font-semibold">Estado</h2>
+        <StatusPicker projectId={projectId} requestId={requestId} status={request.status} />
+      </section>
+      <section aria-labelledby="notas-title" className="flex max-w-[640px] flex-col gap-3">
+        <h2 id="notas-title" className="m-0 text-[18px]/[24px] font-semibold">
+          Notas internas
+        </h2>
+        <p className="m-0 text-[13px]/[18px] text-ink-muted">Solo las ve la banda; el cliente nunca.</p>
+        {notes.length > 0 && (
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {notes.map((n) => (
+              <li key={n.id} className="flex flex-col gap-1 rounded-lg border border-line bg-bg-1 p-3">
+                <span className="text-[12px]/[16px] text-ink-muted">
+                  {n.authorName} · {formatDateTime(n.createdAt)}
+                </span>
+                <span className="whitespace-pre-wrap break-words text-[14px]/[20px]">{n.body}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <NoteForm projectId={projectId} requestId={requestId} />
+      </section>
+      <section className="max-w-[640px]">
+        <DeleteRequest projectId={projectId} requestId={requestId} />
       </section>
     </main>
   );

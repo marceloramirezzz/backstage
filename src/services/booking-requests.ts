@@ -3,6 +3,7 @@ import type { User } from "./accounts.ts";
 import { bookingConfirmationEmail, newBookingRequestEmail } from "../email/booking-request-email.ts";
 import type { EmailMessage, Mailer } from "../email/mailer.ts";
 import {
+  BOOKING_STATUSES,
   EVENT_TYPES,
   URGENCIES,
   type BookingEventType,
@@ -202,18 +203,123 @@ const REQUEST_COLUMNS = `id, client_name AS "clientName", phone, email, event_ty
   to_char(event_date, 'YYYY-MM-DD') AS "eventDate", description, venue, location, guests, urgency,
   music_style AS "musicStyle", status, created_at AS "createdAt"`;
 
-// The Project's requests, newest first. Needs "manage bookings".
+export interface BookingRequestFilters {
+  status?: BookingStatus;
+  eventType?: BookingEventType;
+  // Event date range, YYYY-MM-DD, both ends included.
+  from?: string;
+  to?: string;
+}
+
+export interface BookingNote {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
+// The Project's requests, newest first, narrowed by every filter given. Needs
+// "manage bookings".
 export async function listBookingRequests(
   pool: Pool,
   user: User,
   projectId: string,
+  filters: BookingRequestFilters = {},
 ): Promise<BookingRequest[]> {
   await requirePermission(pool, user, projectId, "manageBookings");
+  const { status, eventType, from, to } = filters;
+  if (status !== undefined && !BOOKING_STATUSES.includes(status)) throw invalid("El estado no es válido");
+  if (eventType !== undefined && !EVENT_TYPES.includes(eventType)) throw invalid("El tipo de evento no es válido");
+  if (from !== undefined) validDay(from);
+  if (to !== undefined) validDay(to);
   const { rows } = await pool.query<BookingRequest>(
-    `SELECT ${REQUEST_COLUMNS} FROM booking_requests WHERE project_id = $1 ORDER BY created_at DESC, id`,
-    [projectId],
+    `SELECT ${REQUEST_COLUMNS} FROM booking_requests
+     WHERE project_id = $1
+       AND ($2::booking_status IS NULL OR status = $2)
+       AND ($3::booking_event_type IS NULL OR event_type = $3)
+       AND ($4::date IS NULL OR event_date >= $4)
+       AND ($5::date IS NULL OR event_date <= $5)
+     ORDER BY created_at DESC, id`,
+    [projectId, status ?? null, eventType ?? null, from ?? null, to ?? null],
   );
   return rows;
+}
+
+// Checks "manage bookings" and that the request belongs to the Project; a
+// request elsewhere reads as not found.
+async function requireRequest(pool: Pool, user: User, projectId: string, requestId: string): Promise<void> {
+  await requirePermission(pool, user, projectId, "manageBookings");
+  if (!isUuid(requestId)) throw new ServiceError("not_found", "Request not found");
+  const { rows } = await pool.query(`SELECT 1 FROM booking_requests WHERE id = $1 AND project_id = $2`, [
+    requestId,
+    projectId,
+  ]);
+  if (!rows[0]) throw new ServiceError("not_found", "Request not found");
+}
+
+// Moves a request to any status, in any direction. Needs "manage bookings".
+export async function setBookingStatus(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  requestId: string,
+  status: BookingStatus,
+): Promise<BookingRequest> {
+  await requireRequest(pool, user, projectId, requestId);
+  if (!BOOKING_STATUSES.includes(status)) throw invalid("El estado no es válido");
+  const { rows } = await pool.query<BookingRequest>(
+    `UPDATE booking_requests SET status = $3 WHERE id = $1 AND project_id = $2 RETURNING ${REQUEST_COLUMNS}`,
+    [requestId, projectId, status],
+  );
+  return rows[0];
+}
+
+const MAX_NOTE = 4000;
+const NOTE_COLUMNS = `id, body, author_name AS "authorName", created_at AS "createdAt"`;
+
+// Adds an internal note signed by the acting User. Needs "manage bookings".
+export async function addBookingNote(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  requestId: string,
+  body: string,
+): Promise<BookingNote> {
+  await requireRequest(pool, user, projectId, requestId);
+  const note = optionalText(body, MAX_NOTE, "La nota");
+  if (!note) throw invalid("Escribí la nota");
+  const { rows } = await pool.query<BookingNote>(
+    `INSERT INTO booking_request_notes (request_id, author_id, author_name, body)
+     VALUES ($1, $2, $3, $4) RETURNING ${NOTE_COLUMNS}`,
+    [requestId, user.id, user.displayName, note],
+  );
+  return rows[0];
+}
+
+// The request's internal notes, oldest first. Needs "manage bookings".
+export async function listBookingNotes(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  requestId: string,
+): Promise<BookingNote[]> {
+  await requireRequest(pool, user, projectId, requestId);
+  const { rows } = await pool.query<BookingNote>(
+    `SELECT ${NOTE_COLUMNS} FROM booking_request_notes WHERE request_id = $1 ORDER BY created_at, id`,
+    [requestId],
+  );
+  return rows;
+}
+
+// Deletes the request and, with it, its notes. Needs "manage bookings".
+export async function deleteBookingRequest(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  requestId: string,
+): Promise<void> {
+  await requireRequest(pool, user, projectId, requestId);
+  await pool.query(`DELETE FROM booking_requests WHERE id = $1 AND project_id = $2`, [requestId, projectId]);
 }
 
 // One of the Project's requests. Needs "manage bookings"; another Project's

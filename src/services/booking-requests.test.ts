@@ -5,9 +5,13 @@ import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import type { Mailer } from "../email/mailer.ts";
 import {
+  addBookingNote,
+  deleteBookingRequest,
   getBookingRequest,
+  listBookingNotes,
   listBookingRequests,
   RATE_LIMIT_PER_HOUR,
+  setBookingStatus,
   submitBookingRequest,
   type BookingRequestInput,
 } from "./booking-requests.ts";
@@ -301,6 +305,125 @@ describe("Booking Requests", () => {
       await assert.rejects(getBookingRequest(db.pool, a.owner, a.project.id, id), { code: "not_found" });
       await assert.rejects(getBookingRequest(db.pool, a.owner, other.project.id, id), { code: "not_found" });
       await assert.rejects(getBookingRequest(db.pool, a.owner, a.project.id, "nope"), { code: "not_found" });
+    });
+  });
+
+  describe("working a request", () => {
+    it("moves the status freely in any direction and persists it", async () => {
+      const b = await band("status");
+      const { id } = await submit(memoryMailer(), b.slug);
+      for (const status of ["completed", "new", "quote_sent", "cancelled", "contacted", "confirmed"] as const) {
+        const updated = await setBookingStatus(db.pool, b.manager, b.project.id, id, status);
+        assert.equal(updated.status, status);
+        assert.equal((await getBookingRequest(db.pool, b.owner, b.project.id, id)).status, status);
+      }
+    });
+
+    it("rejects an unknown status", async () => {
+      const b = await band("badstatus");
+      const { id } = await submit(memoryMailer(), b.slug);
+      await assert.rejects(setBookingStatus(db.pool, b.owner, b.project.id, id, "won" as never), {
+        code: "invalid_input",
+      });
+    });
+
+    it("records notes with author and time, oldest first, and trims them", async () => {
+      const b = await band("notes");
+      const { id } = await submit(memoryMailer(), b.slug);
+      const first = await addBookingNote(db.pool, b.owner, b.project.id, id, "  Llamé, pidió cotización ");
+      await addBookingNote(db.pool, b.manager, b.project.id, id, "Enviada");
+
+      assert.equal(first.body, "Llamé, pidió cotización");
+      assert.equal(first.authorName, b.owner.displayName);
+      const notes = await listBookingNotes(db.pool, b.manager, b.project.id, id);
+      assert.deepEqual(notes.map((n) => [n.body, n.authorName]), [
+        ["Llamé, pidió cotización", b.owner.displayName],
+        ["Enviada", b.manager.displayName],
+      ]);
+      assert.ok(!Number.isNaN(Date.parse(notes[0].createdAt)));
+    });
+
+    it("rejects blank notes", async () => {
+      const b = await band("blanknote");
+      const { id } = await submit(memoryMailer(), b.slug);
+      await assert.rejects(addBookingNote(db.pool, b.owner, b.project.id, id, "  "), { code: "invalid_input" });
+    });
+
+    it("keeps a note after its author's account is gone", async () => {
+      const b = await band("ghost");
+      const { id } = await submit(memoryMailer(), b.slug);
+      await addBookingNote(db.pool, b.manager, b.project.id, id, "Hola");
+      await db.pool.query("DELETE FROM memberships WHERE user_id = $1", [b.manager.id]);
+      await db.pool.query("DELETE FROM users WHERE id = $1", [b.manager.id]);
+      const [note] = await listBookingNotes(db.pool, b.owner, b.project.id, id);
+      assert.equal(note.authorName, b.manager.displayName);
+    });
+
+    it("filters by status, event type and event date range, and combines them", async () => {
+      const b = await band("filter");
+      const mailer = memoryMailer();
+      const a = await submit(mailer, b.slug, { eventType: "wedding", eventDate: "2027-01-10" });
+      const c = await submit(mailer, b.slug, { eventType: "wedding", eventDate: "2027-02-10" });
+      const d = await submit(mailer, b.slug, { eventType: "festival", eventDate: "2027-02-20" });
+      await setBookingStatus(db.pool, b.owner, b.project.id, c.id, "contacted");
+      const ids = async (f: Parameters<typeof listBookingRequests>[3]) =>
+        (await listBookingRequests(db.pool, b.owner, b.project.id, f)).map((r) => r.id).sort();
+
+      assert.deepEqual(await ids({}), [a.id, c.id, d.id].sort());
+      assert.deepEqual(await ids({ status: "contacted" }), [c.id]);
+      assert.deepEqual(await ids({ eventType: "wedding" }), [a.id, c.id].sort());
+      assert.deepEqual(await ids({ from: "2027-02-10" }), [c.id, d.id].sort());
+      assert.deepEqual(await ids({ to: "2027-02-10" }), [a.id, c.id].sort());
+      assert.deepEqual(await ids({ from: "2027-02-01", to: "2027-02-15" }), [c.id]);
+      assert.deepEqual(await ids({ eventType: "wedding", from: "2027-02-01" }), [c.id]);
+      assert.deepEqual(await ids({ status: "new", eventType: "wedding", from: "2027-02-01" }), []);
+    });
+
+    it("rejects malformed filters", async () => {
+      const b = await band("badfilter");
+      for (const f of [{ status: "x" }, { eventType: "x" }, { from: "yesterday" }, { to: "2027-13-40" }]) {
+        await assert.rejects(listBookingRequests(db.pool, b.owner, b.project.id, f as never), {
+          code: "invalid_input",
+        });
+      }
+    });
+
+    it("deletes a request together with its notes", async () => {
+      const b = await band("delete");
+      const keep = await submit(memoryMailer(), b.slug);
+      const { id } = await submit(memoryMailer(), b.slug);
+      await addBookingNote(db.pool, b.owner, b.project.id, id, "nota");
+
+      await deleteBookingRequest(db.pool, b.manager, b.project.id, id);
+
+      await assert.rejects(getBookingRequest(db.pool, b.owner, b.project.id, id), { code: "not_found" });
+      const { rows } = await db.pool.query("SELECT 1 FROM booking_request_notes WHERE request_id = $1", [id]);
+      assert.equal(rows.length, 0);
+      assert.deepEqual((await listBookingRequests(db.pool, b.owner, b.project.id)).map((r) => r.id), [keep.id]);
+      await assert.rejects(deleteBookingRequest(db.pool, b.owner, b.project.id, id), { code: "not_found" });
+    });
+
+    it("is closed to Members without the permission", async () => {
+      const b = await band("gate");
+      const { id } = await submit(memoryMailer(), b.slug);
+      for (const who of [b.member, b.roadie]) {
+        await assert.rejects(setBookingStatus(db.pool, who, b.project.id, id, "contacted"), { code: "forbidden" });
+        await assert.rejects(addBookingNote(db.pool, who, b.project.id, id, "x"), { code: "forbidden" });
+        await assert.rejects(listBookingNotes(db.pool, who, b.project.id, id), { code: "forbidden" });
+        await assert.rejects(deleteBookingRequest(db.pool, who, b.project.id, id), { code: "forbidden" });
+      }
+      assert.equal((await getBookingRequest(db.pool, b.owner, b.project.id, id)).status, "new");
+    });
+
+    it("never touches another Project's request", async () => {
+      const a = await band("scope-a");
+      const other = await band("scope-b");
+      const { id } = await submit(memoryMailer(), other.slug);
+      await assert.rejects(setBookingStatus(db.pool, a.owner, a.project.id, id, "cancelled"), { code: "not_found" });
+      await assert.rejects(addBookingNote(db.pool, a.owner, a.project.id, id, "x"), { code: "not_found" });
+      await assert.rejects(listBookingNotes(db.pool, a.owner, a.project.id, id), { code: "not_found" });
+      await assert.rejects(deleteBookingRequest(db.pool, a.owner, a.project.id, id), { code: "not_found" });
+      assert.equal((await getBookingRequest(db.pool, other.owner, other.project.id, id)).status, "new");
     });
   });
 });
