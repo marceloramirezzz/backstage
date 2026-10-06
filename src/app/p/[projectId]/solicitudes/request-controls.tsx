@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Field, Select } from "@/components/ui/field.tsx";
 import { iconProps } from "@/components/ui/icon-props.ts";
 import { BOOKING_STATUS_LABELS, BOOKING_STATUSES, type BookingStatus } from "@/lib/booking.ts";
-import { addRequestNote, changeRequestStatus, deleteRequest } from "./actions.ts";
+import { addRequestNote, changeRequestStatus, convertRequest, deleteRequest } from "./actions.ts";
 
 // Moves the Solicitud to any status, in any direction.
 export function StatusPicker({
@@ -104,6 +104,26 @@ export function DeleteRequest({ projectId, requestId }: { projectId: string; req
           </Button>
         </div>
       )}
+      {error && <FormMessage tone="error">{error}</FormMessage>}
+    </div>
+  );
+}
+
+// The one-time conversion into a Confirmed Event. Status and Members are untouched and nobody is emailed.
+export function ConvertRequest({ projectId, requestId }: { projectId: string; requestId: string }) {
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="flex flex-col gap-2">
+      <div>
+        <Button
+          variant="primary"
+          disabled={pending}
+          onClick={() => startTransition(async () => setError((await convertRequest(projectId, requestId))?.error))}
+        >
+          Convertir en evento
+        </Button>
+      </div>
       {error && <FormMessage tone="error">{error}</FormMessage>}
     </div>
   );

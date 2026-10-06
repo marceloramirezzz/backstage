@@ -6,7 +6,7 @@ import { getPool } from "@/db/pool.ts";
 import { BOOKING_STATUSES, type BookingStatus } from "@/lib/booking.ts";
 import { text } from "@/lib/form.ts";
 import { requireUser } from "@/lib/session.ts";
-import { addBookingNote, deleteBookingRequest, setBookingStatus } from "@/services/booking-requests.ts";
+import { addBookingNote, convertBookingRequest, deleteBookingRequest, setBookingStatus } from "@/services/booking-requests.ts";
 import { ServiceError } from "@/services/errors.ts";
 
 export interface NoteActionState {
@@ -18,6 +18,7 @@ export interface NoteActionState {
 const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
   forbidden: "Tu rol no puede trabajar las solicitudes.",
   not_found: "Esta solicitud ya no existe.",
+  already_converted: "Esta solicitud ya se convirtió en evento.",
   invalid_input: "Revisá los datos: la nota no puede estar vacía ni superar los 4000 caracteres.",
 };
 
@@ -64,4 +65,22 @@ export async function deleteRequest(projectId: string, requestId: string): Promi
     }
   }
   redirect(`/p/${projectId}/solicitudes`);
+}
+
+// Creates the Event and goes to it; if the request was already converted or
+// can't be, says why instead.
+export async function convertRequest(projectId: string, requestId: string): Promise<{ error?: string }> {
+  const user = await requireUser();
+  let eventId: string;
+  try {
+    ({ eventId } = await convertBookingRequest(getPool(), user, projectId, requestId));
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "forbidden") {
+      return { error: "Convertir una solicitud necesita gestionar solicitudes y editar eventos." };
+    }
+    const message = err instanceof ServiceError && MESSAGES[err.code];
+    if (message) return { error: message };
+    throw err;
+  }
+  redirect(`/p/${projectId}/eventos/${eventId}`);
 }

@@ -20,7 +20,8 @@ export type ServiceErrorCode =
   | "selection_in_use"
   | "slug_taken"
   | "slug_reserved"
-  | "rate_limited";
+  | "rate_limited"
+  | "already_converted";
 
 // An expected, user-facing failure of a service call. Callers switch on `code`.
 export class ServiceError extends Error {

@@ -107,6 +107,7 @@ describe("Booking Requests", () => {
         urgency: "high",
         musicStyle: "cumbia y rock",
         status: "new",
+        eventId: null,
         createdAt: request.createdAt,
       });
       assert.deepEqual(await listBookingRequests(db.pool, other.owner, other.project.id), []);
