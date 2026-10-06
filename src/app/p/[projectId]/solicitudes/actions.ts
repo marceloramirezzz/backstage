@@ -18,7 +18,7 @@ export interface NoteActionState {
 const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
   forbidden: "Tu rol no puede trabajar las solicitudes.",
   not_found: "Esta solicitud ya no existe.",
-  invalid_input: "Escribí la nota (hasta 4000 caracteres).",
+  invalid_input: "Revisá los datos: la nota no puede estar vacía ni superar los 4000 caracteres.",
 };
 
 // The message for a failed call, or a rethrow when it isn't expected.

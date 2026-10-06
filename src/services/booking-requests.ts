@@ -271,6 +271,7 @@ export async function setBookingStatus(
     `UPDATE booking_requests SET status = $3 WHERE id = $1 AND project_id = $2 RETURNING ${REQUEST_COLUMNS}`,
     [requestId, projectId, status],
   );
+  if (!rows[0]) throw new ServiceError("not_found", "Request not found");
   return rows[0];
 }
 

@@ -72,11 +72,12 @@ export const formatShortDate = (iso: string) =>
     .format(new Date(iso))
     .replace(".", "");
 
-// `2 oct, 14:30`: a moment's day and time in the Project's time zone.
+// `2 oct 2026, 14:30`: a moment's day and time in the Project's time zone.
 export const formatDateTime = (iso: string) =>
   new Intl.DateTimeFormat("es-PY", {
     day: "numeric",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
