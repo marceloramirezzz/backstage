@@ -10,6 +10,7 @@ export const SECTIONS = [
   { path: "reparto", label: "Reparto", requires: "administer" },
   { path: "miembros", label: "Miembros", requires: null },
   { path: "pagina-publica", label: "Página pública", requires: "administer" },
+  { path: "contrato", label: "Contrato", requires: "administer" },
 ] as const;
 
 export type SectionPath = (typeof SECTIONS)[number]["path"];

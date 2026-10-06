@@ -4,7 +4,7 @@ import { memoryMailer } from "../../test/mailer.ts";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import { submitBookingRequest } from "./booking-requests.ts";
-import { generateInvoice, generateQuote } from "./documents.ts";
+import { generateContract, generateInvoice, generateQuote, getContractTemplate, saveContractTemplate } from "./documents.ts";
 import { createEvent, deleteEvent } from "./events.ts";
 import { acceptInvitation, sendInvitations } from "./invitations.ts";
 import { saveLandingSettings } from "./landing-page.ts";
@@ -250,5 +250,79 @@ describe("documents: quote numbering and generation", () => {
     const free = await event(b, "Gratis", 0);
 
     await assert.rejects(generateInvoice(db.pool, b.owner, b.project.id, free.id), { code: "invalid_input" });
+  });
+});
+
+describe("documents: contract template and PDF", () => {
+  let db: TestDb;
+  before(async () => {
+    db = await createTestDb();
+  });
+  after(() => db.close());
+
+  async function band(name: string) {
+    const owner = await verifiedUser(db, `${name}-owner@example.com`);
+    const project = await createProject(db.pool, owner, { name });
+    const role = await createRole(db.pool, owner, project.id, {
+      name: "bookings",
+      toggles: { ...NO_TOGGLES, manageBookings: true, seeTotalPayExpenses: true },
+    });
+    const staff = await verifiedUser(db, `${name}-staff@example.com`);
+    const [{ invitation }] = await sendInvitations(db.pool, owner, project.id, [{ email: staff.email, roleId: role.id }]);
+    await acceptInvitation(db.pool, staff, invitation.id);
+    const e = await createEvent(db.pool, owner, project.id, {
+      name: "Boda",
+      date: "2027-03-20",
+      durationMinutes: 120,
+      pay: 2_000_000,
+      location: "Luque",
+    });
+    return { owner, staff, project, event: e };
+  }
+
+  it("serves the default template until an Admin edits it, and only Admins read or edit it", async () => {
+    const b = await band("tpl");
+
+    const initial = await getContractTemplate(db.pool, b.owner, b.project.id);
+    await saveContractTemplate(db.pool, b.owner, b.project.id, "Hola {{cliente}}");
+
+    assert.match(initial, /\{\{banda\}\}/);
+    assert.equal(await getContractTemplate(db.pool, b.owner, b.project.id), "Hola {{cliente}}");
+    await assert.rejects(getContractTemplate(db.pool, b.staff, b.project.id), { code: "forbidden" });
+    await assert.rejects(saveContractTemplate(db.pool, b.staff, b.project.id, "x"), { code: "forbidden" });
+    await assert.rejects(saveContractTemplate(db.pool, b.owner, b.project.id, "  "), { code: "invalid_input" });
+  });
+
+  it("fills the Project's template and keeps its number on regeneration", async () => {
+    const b = await band("gen");
+    await saveContractTemplate(db.pool, b.owner, b.project.id, "{{banda}} / {{evento}} / {{cachet}}");
+
+    const first = await generateContract(db.pool, b.staff, b.project.id, b.event.id);
+    const again = await generateContract(db.pool, b.owner, b.project.id, b.event.id);
+
+    assert.equal(first.number, 1);
+    assert.equal(again.number, 1);
+    assert.deepEqual(first.model.paragraphs, ["gen / Boda / Gs. 2.000.000"]);
+  });
+
+  it("is gated like the other Documents and needs a cachet", async () => {
+    const b = await band("gate");
+    const plain = await verifiedUser(db, "gate-plain@example.com");
+
+    const free = await createEvent(db.pool, b.owner, b.project.id, {
+      name: "Gratis",
+      date: "2027-04-01",
+      durationMinutes: 60,
+      pay: 0,
+    });
+    const member = await verifiedUser(db, "gate-member@example.com");
+    const memberRole = (await listRoles(db.pool, b.owner, b.project.id)).find((r) => r.kind === "member")!;
+    const [{ invitation }] = await sendInvitations(db.pool, b.owner, b.project.id, [{ email: member.email, roleId: memberRole.id }]);
+    await acceptInvitation(db.pool, member, invitation.id);
+
+    await assert.rejects(generateContract(db.pool, member, b.project.id, b.event.id), { code: "forbidden" });
+    await assert.rejects(generateContract(db.pool, plain, b.project.id, b.event.id), { code: "not_found" });
+    await assert.rejects(generateContract(db.pool, b.owner, b.project.id, "not-a-uuid"), { code: "not_found" });
+    await assert.rejects(generateContract(db.pool, b.owner, b.project.id, free.id), { code: "invalid_input" });
   });
 });

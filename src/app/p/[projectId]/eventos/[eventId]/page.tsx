@@ -98,6 +98,11 @@ export default async function EventPage({
               Descargar factura (PDF)
             </a>
           )}
+          {permissions.manageBookings && permissions.seeTotalPayExpenses && (event.pay ?? 0) > 0 && (
+            <a href={`/p/${projectId}/documentos/contrato?evento=${event.id}`} className="text-[13px]/[18px] underline">
+              Descargar contrato (PDF)
+            </a>
+          )}
         </div>
         {canEdit && (
           <div className="ml-auto flex flex-col items-end gap-2">
