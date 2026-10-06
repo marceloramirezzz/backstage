@@ -1,16 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { computeMemberPayout, EQUAL_SHARE, type MemberPayoutResult, type MemberRule } from "./member-payout-math.ts";
-import type { SplitKind, SplitRule } from "./payout-math.ts";
 import type { RoleKind } from "./permissions.ts";
-
-// A Role as the Split sees it.
-export interface SplitRole {
-  id: string;
-  name: string;
-  kind: RoleKind;
-  // Members holding it now.
-  memberCount: number;
-}
 
 // One attending Member's line of a Payout: the rule that applied and what they get.
 export interface PayoutMember {
@@ -26,7 +16,7 @@ export interface PayoutMember {
 
 // An Event's Payout Split as an Admin sees it: the math and everyone's share.
 // Snapshots frozen before per-Member rules (ADR 0003) lack `members` and carry
-// the Role-based `source`, `rules` and `roles` instead.
+// the Role-based `source` and `roles` instead.
 export interface FullPayout {
   scope: "full";
   // When this Payout was frozen (the Event is Paid); null while it's a live preview.
@@ -44,14 +34,13 @@ export interface FullPayout {
   guests: { id: string; name: string; amount: number; fixedAmount: number }[];
   // Whoever takes what rounding leaves over.
   remainderRecipient: string | null;
-  // Legacy Role-based snapshots only.
+  // Legacy Role-based snapshots only: frozen Paid Events keep rendering from these.
   source?: "default" | "event";
-  rules?: SplitRule[];
   roles?: {
     roleId: string;
     name: string;
     roleKind: RoleKind;
-    kind: SplitKind;
+    kind: "percentage" | "role_fixed" | "member_fixed";
     value: number;
     skipped: boolean;
     amount: number;
@@ -60,36 +49,6 @@ export interface FullPayout {
 }
 
 export type Db = Pool | PoolClient;
-
-export async function defaultRules(db: Db, projectId: string): Promise<SplitRule[]> {
-  const { rows } = await db.query<SplitRule>(
-    `SELECT role_id AS "roleId", kind, value::float8 AS value
-     FROM project_split_rules WHERE project_id = $1 ORDER BY role_id`,
-    [projectId],
-  );
-  return rows;
-}
-
-export async function effectiveRules(db: Db, projectId: string, eventId: string) {
-  const { rows: own } = await db.query("SELECT 1 FROM event_splits WHERE event_id = $1", [eventId]);
-  if (!own[0]) return { source: "default" as const, rules: await defaultRules(db, projectId) };
-  const { rows } = await db.query<SplitRule>(
-    `SELECT role_id AS "roleId", kind, value::float8 AS value
-     FROM event_split_rules WHERE event_id = $1 ORDER BY role_id`,
-    [eventId],
-  );
-  return { source: "event" as const, rules: rows };
-}
-
-export async function projectRoles(db: Db, projectId: string): Promise<SplitRole[]> {
-  const { rows } = await db.query<SplitRole>(
-    `SELECT r.id, r.name, r.kind, count(m.user_id)::int AS "memberCount"
-     FROM roles r LEFT JOIN memberships m ON m.role_id = r.id AND m.project_id = r.project_id
-     WHERE r.project_id = $1 GROUP BY r.id ORDER BY r.kind, r.name`,
-    [projectId],
-  );
-  return rows;
-}
 
 // Each Member's rule in the Project (no row: Equal share).
 export async function defaultMemberRules(db: Db, projectId: string): Promise<Map<string, MemberRule>> {
