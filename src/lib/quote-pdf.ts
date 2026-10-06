@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { wrap } from "./pdf-text.ts";
 import type { QuoteModel } from "./quote.ts";
 
 const PAGE = { width: 595, height: 842 }; // A4
@@ -51,21 +52,4 @@ export async function renderQuotePdf(model: QuoteModel): Promise<Uint8Array> {
   text(model.total, PAGE.width - MARGIN - totalWidth, 18, bold);
 
   return pdf.save();
-}
-
-// Breaks `value` into lines that fit `width`.
-function wrap(value: string, font: { widthOfTextAtSize(t: string, s: number): number }, size: number, width: number) {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of value.split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word;
-    if (line && font.widthOfTextAtSize(next, size) > width) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
-  }
-  lines.push(line);
-  return lines;
 }
