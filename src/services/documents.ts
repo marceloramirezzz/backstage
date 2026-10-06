@@ -2,11 +2,12 @@ import type { Pool, PoolClient } from "pg";
 import type { User } from "./accounts.ts";
 import { EVENT_TYPE_LABELS, type BookingEventType } from "../lib/booking.ts";
 import { todayIn } from "../lib/format.ts";
+import { buildContractModel, DEFAULT_CONTRACT_TEMPLATE, MAX_TEMPLATE_LENGTH, type ContractModel } from "../lib/contract.ts";
 import { buildInvoiceModel, type InvoiceModel } from "../lib/invoice.ts";
 import { buildQuoteModel, type QuoteModel } from "../lib/quote.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
-import { getPermissions } from "./permissions.ts";
+import { getPermissions, requirePermission } from "./permissions.ts";
 import { inTransaction } from "./transaction.ts";
 
 export type DocumentType = "quote" | "contract" | "invoice";
@@ -102,6 +103,85 @@ export async function generateInvoice(
         location: event.location,
         cachet: event.pay,
         payments,
+      }),
+    };
+  });
+}
+
+// The Project's contract template: the Admin's edit, or the default until then.
+// Only Admins see or edit it.
+export async function getContractTemplate(pool: Pool, user: User, projectId: string): Promise<string> {
+  await requirePermission(pool, user, projectId, "administer");
+  const { rows } = await pool.query<{ body: string }>("SELECT body FROM contract_templates WHERE project_id = $1", [
+    projectId,
+  ]);
+  return rows[0]?.body ?? DEFAULT_CONTRACT_TEMPLATE;
+}
+
+export async function saveContractTemplate(pool: Pool, user: User, projectId: string, body: string): Promise<void> {
+  await requirePermission(pool, user, projectId, "administer");
+  if (body.trim() === "" || body.length > MAX_TEMPLATE_LENGTH) {
+    throw new ServiceError("invalid_input", `The contract template must have 1 to ${MAX_TEMPLATE_LENGTH} characters`);
+  }
+  await pool.query(
+    `INSERT INTO contract_templates (project_id, body) VALUES ($1, $2)
+     ON CONFLICT (project_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()`,
+    [projectId, body],
+  );
+}
+
+export interface Contract {
+  number: number;
+  model: ContractModel;
+}
+
+// An Event's contract: the Project's template filled from the Event. Numbered
+// like a quote (first generation takes the next number, regenerations keep
+// it), with the same permissions.
+export async function generateContract(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  eventId: string,
+): Promise<Contract> {
+  const permissions = await getPermissions(pool, user, projectId);
+  if (!permissions.manageBookings || !permissions.seeTotalPayExpenses) {
+    throw new ServiceError("forbidden", "You don't have permission to do that");
+  }
+  if (!isUuid(eventId)) throw new ServiceError("not_found", "Event not found");
+  return inTransaction(pool, async (client) => {
+    const { rows } = await client.query<{
+      name: string;
+      date: string;
+      location: string | null;
+      pay: number;
+      clientName: string | null;
+      bandName: string;
+      template: string | null;
+    }>(
+      `SELECT e.name, to_char(e.date, 'YYYY-MM-DD') AS date, e.location, e.pay::float8 AS pay,
+              (SELECT b.client_name FROM booking_requests b WHERE b.event_id = e.id) AS "clientName",
+              (SELECT p.name FROM projects p WHERE p.id = e.project_id) AS "bandName",
+              (SELECT t.body FROM contract_templates t WHERE t.project_id = e.project_id) AS template
+       FROM events e WHERE e.id = $1 AND e.project_id = $2`,
+      [eventId, projectId],
+    );
+    const event = rows[0];
+    if (!event) throw new ServiceError("not_found", "Event not found");
+    if (event.pay <= 0) throw new ServiceError("invalid_input", "The Event has no cachet to put in a contract");
+    const number = await documentNumber(client, projectId, "contract", { eventId });
+    return {
+      number,
+      model: buildContractModel({
+        template: event.template ?? DEFAULT_CONTRACT_TEMPLATE,
+        bandName: event.bandName,
+        number,
+        issuedOn: todayIn(),
+        clientName: event.clientName,
+        eventName: event.name,
+        eventDate: event.date,
+        location: event.location,
+        cachet: event.pay,
       }),
     };
   });

@@ -1,6 +1,7 @@
 import {
   Calendar,
   DollarSign,
+  FileText,
   Globe,
   House,
   Inbox,
@@ -37,6 +38,7 @@ const ICONS: Record<SectionPath, ReactNode> = {
   reparto: <DollarSign {...iconProps} />,
   miembros: <Users {...iconProps} />,
   "pagina-publica": <Globe {...iconProps} />,
+  contrato: <FileText {...iconProps} />,
 };
 
 export default async function ProjectLayout({ children, params }: LayoutProps<"/p/[projectId]">) {
