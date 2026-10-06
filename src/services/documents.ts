@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 import type { User } from "./accounts.ts";
 import { EVENT_TYPE_LABELS, type BookingEventType } from "../lib/booking.ts";
 import { todayIn } from "../lib/format.ts";
+import { buildInvoiceModel, type InvoiceModel } from "../lib/invoice.ts";
 import { buildQuoteModel, type QuoteModel } from "../lib/quote.ts";
 import { ServiceError } from "./errors.ts";
 import { isUuid } from "./ids.ts";
@@ -14,6 +15,9 @@ export type DocumentType = "quote" | "contract" | "invoice";
 // whoever generates it states the amount (whole Guaraníes); an Event's quote
 // uses its cachet.
 export type QuoteSource = { eventId: string } | { bookingRequestId: string; amount: number };
+
+// What a Document's number is recorded against.
+type DocumentSource = { eventId: string } | { bookingRequestId: string };
 
 export interface Quote {
   number: number;
@@ -39,6 +43,67 @@ export async function generateQuote(
     const number = await documentNumber(client, projectId, "quote", source);
     const { rows } = await client.query<{ name: string }>("SELECT name FROM projects WHERE id = $1", [projectId]);
     return { number, model: buildQuoteModel({ bandName: rows[0].name, number, issuedOn: todayIn(), ...draft }) };
+  });
+}
+
+export interface Invoice {
+  number: number;
+  model: InvoiceModel;
+}
+
+// An Event's invoice: its cachet, the Payments received so far and the balance.
+// Numbered like a quote: the first generation takes the Project's next invoice
+// number and regenerations keep it, while the figures are always current. Same
+// permissions as a quote. A statement, not a fiscal invoice.
+export async function generateInvoice(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  eventId: string,
+): Promise<Invoice> {
+  const permissions = await getPermissions(pool, user, projectId);
+  if (!permissions.manageBookings || !permissions.seeTotalPayExpenses) {
+    throw new ServiceError("forbidden", "You don't have permission to do that");
+  }
+  if (!isUuid(eventId)) throw new ServiceError("not_found", "Event not found");
+  return inTransaction(pool, async (client) => {
+    const { rows } = await client.query<{
+      name: string;
+      date: string;
+      location: string | null;
+      pay: number;
+      clientName: string | null;
+      bandName: string;
+    }>(
+      `SELECT e.name, to_char(e.date, 'YYYY-MM-DD') AS date, e.location, e.pay::float8 AS pay,
+              (SELECT b.client_name FROM booking_requests b WHERE b.event_id = e.id) AS "clientName",
+              (SELECT p.name FROM projects p WHERE p.id = e.project_id) AS "bandName"
+       FROM events e WHERE e.id = $1 AND e.project_id = $2`,
+      [eventId, projectId],
+    );
+    const event = rows[0];
+    if (!event) throw new ServiceError("not_found", "Event not found");
+    if (event.pay <= 0) throw new ServiceError("invalid_input", "The Event has no cachet to invoice");
+    const { rows: payments } = await client.query<{ date: string; amount: number; note: string | null }>(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date, amount::float8 AS amount, note
+       FROM event_payments WHERE event_id = $1 ORDER BY date, created_at, id`,
+      [eventId],
+    );
+    const number = await documentNumber(client, projectId, "invoice", { eventId });
+    return {
+      number,
+      model: buildInvoiceModel({
+        bandName: event.bandName,
+        number,
+        issuedOn: todayIn(),
+        clientName: event.clientName,
+        eventName: event.name,
+        eventDate: event.date,
+        location: event.location,
+        cachet: event.pay,
+        payments,
+      }),
+    };
   });
 }
 
@@ -104,7 +169,7 @@ async function documentNumber(
   client: PoolClient,
   projectId: string,
   type: DocumentType,
-  source: QuoteSource,
+  source: DocumentSource,
 ): Promise<number> {
   await client.query(
     `INSERT INTO document_sequences (project_id, type, last_number) VALUES ($1, $2, 0)

@@ -4,10 +4,11 @@ import { memoryMailer } from "../../test/mailer.ts";
 import { createTestDb, type TestDb } from "../../test/test-db.ts";
 import { verifiedUser } from "../../test/users.ts";
 import { submitBookingRequest } from "./booking-requests.ts";
-import { generateQuote } from "./documents.ts";
+import { generateInvoice, generateQuote } from "./documents.ts";
 import { createEvent, deleteEvent } from "./events.ts";
 import { acceptInvitation, sendInvitations } from "./invitations.ts";
 import { saveLandingSettings } from "./landing-page.ts";
+import { addPayment } from "./payments.ts";
 import { createProject } from "./projects.ts";
 import { createRole, listRoles, type RoleToggles } from "./roles.ts";
 
@@ -189,5 +190,65 @@ describe("documents: quote numbering and generation", () => {
     );
     const paid = await event(b, "Pago");
     assert.equal((await generateQuote(db.pool, b.owner, b.project.id, { eventId: paid.id })).number, 1);
+  });
+
+  it("builds an invoice from the cachet and Payments, numbered separately from quotes", async () => {
+    const b = await band("invoice");
+    const e = await event(b, "Boda", 3_000_000);
+    await generateQuote(db.pool, b.owner, b.project.id, { eventId: e.id });
+    await addPayment(db.pool, b.owner, b.project.id, e.id, { date: "2027-01-10", amount: 1_000_000, note: "Seña" });
+
+    const invoice = await generateInvoice(db.pool, b.both, b.project.id, e.id);
+
+    assert.equal(invoice.number, 1);
+    assert.equal(invoice.model.numberLabel, "FAC-0001");
+    assert.equal(invoice.model.cachet, "Gs. 3.000.000");
+    assert.equal(invoice.model.received, "Gs. 1.000.000");
+    assert.equal(invoice.model.balance, "Gs. 2.000.000");
+    assert.equal(invoice.model.payments.length, 1);
+  });
+
+  it("keeps an invoice's number when regenerated with new Payments, and numbers the next Event's 2", async () => {
+    const b = await band("invoice-stable");
+    const e1 = await event(b, "Uno");
+    const e2 = await event(b, "Dos");
+
+    const first = await generateInvoice(db.pool, b.owner, b.project.id, e1.id);
+    await addPayment(db.pool, b.owner, b.project.id, e1.id, { date: "2027-01-10", amount: 500_000 });
+    const again = await generateInvoice(db.pool, b.owner, b.project.id, e1.id);
+    const other = await generateInvoice(db.pool, b.owner, b.project.id, e2.id);
+
+    assert.deepEqual([first.number, again.number, other.number], [1, 1, 2]);
+    assert.equal(first.model.received, "Gs. 0");
+    assert.equal(again.model.received, "Gs. 500.000");
+  });
+
+  it("names the client on the invoice of an Event converted from a request", async () => {
+    const b = await band("invoice-client");
+    const e = await event(b);
+    const r = await request(b.slug);
+    await db.pool.query("UPDATE booking_requests SET event_id = $2 WHERE id = $1", [r, e.id]);
+
+    assert.equal((await generateInvoice(db.pool, b.owner, b.project.id, e.id)).model.clientName, "Ana Benítez");
+  });
+
+  it("requires both permissions for an invoice, and treats another Project's Event as not found", async () => {
+    const b = await band("invoice-perms");
+    const other = await band("invoice-other");
+    const e = await event(b);
+
+    for (const user of [b.member, b.bookingsOnly, b.seeOnly]) {
+      await assert.rejects(generateInvoice(db.pool, user, b.project.id, e.id), { code: "forbidden" });
+    }
+    await assert.rejects(generateInvoice(db.pool, other.owner, other.project.id, e.id), { code: "not_found" });
+    const { rows } = await db.pool.query("SELECT 1 FROM documents WHERE project_id = $1", [b.project.id]);
+    assert.equal(rows.length, 0);
+  });
+
+  it("rejects an invoice for an Event with no cachet", async () => {
+    const b = await band("invoice-free");
+    const free = await event(b, "Gratis", 0);
+
+    await assert.rejects(generateInvoice(db.pool, b.owner, b.project.id, free.id), { code: "invalid_input" });
   });
 });

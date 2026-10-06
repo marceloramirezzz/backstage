@@ -85,3 +85,10 @@ export const formatDateTime = (iso: string) =>
   })
     .format(new Date(iso))
     .replace(".", "");
+
+// `26 de septiembre de 2026`
+export function formatFullDate(date: string): string {
+  return new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${date}T00:00:00Z`),
+  );
+}
