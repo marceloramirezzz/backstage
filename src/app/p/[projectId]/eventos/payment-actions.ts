@@ -15,7 +15,7 @@ export interface PaymentActionState {
 
 const MESSAGES: Partial<Record<ServiceError["code"], string>> = {
   forbidden: "Tu rol no puede editar los pagos recibidos de este evento.",
-  not_found: "Este evento o este pago ya no existe.",
+  not_found: "Este evento o este pago recibido ya no existe.",
   invalid_input: "Revisá la fecha y el monto (en guaraníes enteros, mayor a cero).",
 };
 
