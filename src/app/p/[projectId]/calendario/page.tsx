@@ -4,7 +4,8 @@ import { addMonths, formatMonthTitle, monthGrid, parseMonth } from "@/lib/calend
 import { STATUS_LABELS } from "@/lib/event-status.ts";
 import { todayIn } from "@/lib/format.ts";
 import { requireUser } from "@/lib/session.ts";
-import { EVENT_STATUSES, listEvents } from "@/services/events.ts";
+import { getCalendar } from "@/services/calendar.ts";
+import { EVENT_STATUSES } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { StatusLabel } from "@/components/ui/status-label.tsx";
 import { CalendarView } from "./calendar-view.tsx";
@@ -13,9 +14,8 @@ export const metadata: Metadata = { title: "Calendario · Backstage" };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-// Today on the bands' clock, as `YYYY-MM-DD`.
-
-// The Banda's home: a month of Eventos, as a grid or, under 640px, an agenda.
+// The Banda's home: a month of Eventos and Ensayos, as a grid or, under 640px, an agenda.
+// Cancelled Eventos stay hidden unless asked for.
 // Every Member sees them; Members who can edit events also add, edit and
 // delete them.
 export default async function CalendarPage({
@@ -32,16 +32,19 @@ export default async function CalendarPage({
   const days = monthGrid(month);
   const permissions = await getPermissions(pool, user, projectId);
   const canEdit = permissions.editRepertoireSetlistsEvents;
-  const events = await listEvents(pool, user, projectId, {
+  const showCancelled = first((await searchParams).cancelados) === "1";
+  const { events, rehearsals } = await getCalendar(pool, user, projectId, {
     from: days[0].date,
     to: days.at(-1)!.date,
+    includeCancelled: showCancelled,
   });
 
   const inMonth = events.filter((e) => e.date.startsWith(month));
   const toPlay = inMonth.filter(
     (e) => (e.status === "confirmed" || e.status === "paid") && e.date >= today,
   ).length;
-  const href = (m: string) => `/p/${projectId}/calendario?mes=${m}`;
+  const href = (m: string, cancelled = showCancelled) =>
+    `/p/${projectId}/calendario?mes=${m}${cancelled ? "&cancelados=1" : ""}`;
 
   return (
     <main className="flex min-w-0 flex-col gap-6 p-6 max-desktop:px-4">
@@ -67,6 +70,9 @@ export default async function CalendarPage({
         month={month}
         today={today}
         events={events}
+        rehearsals={rehearsals}
+        showCancelled={showCancelled}
+        cancelledHref={href(month, !showCancelled)}
         canEdit={canEdit}
         canSetPay={canEdit && permissions.seeTotalPayExpenses}
         canDeletePaid={permissions.administer}
