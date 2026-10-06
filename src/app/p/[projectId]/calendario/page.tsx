@@ -3,11 +3,14 @@ import { getPool } from "@/db/pool.ts";
 import { addMonths, formatMonthTitle, monthGrid, parseMonth } from "@/lib/calendar.ts";
 import { STATUS_LABELS } from "@/lib/event-status.ts";
 import { todayIn } from "@/lib/format.ts";
+import { requestOrigin } from "@/lib/origin.ts";
 import { requireUser } from "@/lib/session.ts";
+import { getCalendarFeedToken } from "@/services/calendar-feed.ts";
 import { getCalendar } from "@/services/calendar.ts";
 import { EVENT_STATUSES } from "@/services/events.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { StatusLabel } from "@/components/ui/status-label.tsx";
+import { CalendarFeed } from "./calendar-feed.tsx";
 import { CalendarView } from "./calendar-view.tsx";
 
 export const metadata: Metadata = { title: "Calendario · Backstage" };
@@ -38,6 +41,10 @@ export default async function CalendarPage({
     to: days.at(-1)!.date,
     includeCancelled: showCancelled,
   });
+
+  const feedUrl = permissions.administer
+    ? `${await requestOrigin()}/api/calendar/${await getCalendarFeedToken(pool, user, projectId)}.ics`
+    : null;
 
   const inMonth = events.filter((e) => e.date.startsWith(month));
   const toPlay = inMonth.filter(
@@ -80,6 +87,7 @@ export default async function CalendarPage({
         nextHref={href(addMonths(month, 1))}
         todayHref={href(today.slice(0, 7))}
       />
+      {feedUrl && <CalendarFeed projectId={projectId} url={feedUrl} />}
     </main>
   );
 }
