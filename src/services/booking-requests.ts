@@ -4,6 +4,7 @@ import { bookingConfirmationEmail, newBookingRequestEmail } from "../email/booki
 import type { EmailMessage, Mailer } from "../email/mailer.ts";
 import {
   BOOKING_STATUSES,
+  EVENT_TYPE_LABELS,
   EVENT_TYPES,
   URGENCIES,
   type BookingEventType,
@@ -11,9 +12,10 @@ import {
   type BookingUrgency,
 } from "../lib/booking.ts";
 import { ServiceError } from "./errors.ts";
+import { getPermissions, requirePermission } from "./permissions.ts";
 import { isUuid } from "./ids.ts";
-import { requirePermission } from "./permissions.ts";
 import { hashToken } from "./tokens.ts";
+import { inTransaction } from "./transaction.ts";
 
 // What a prospective client enters on the Landing page.
 export interface BookingRequestInput {
@@ -47,6 +49,8 @@ export interface BookingRequest {
   urgency: BookingUrgency | null;
   musicStyle: string | null;
   status: BookingStatus;
+  // The Event it was converted into, once it has been.
+  eventId: string | null;
   createdAt: string;
 }
 
@@ -201,7 +205,7 @@ async function trySend(mailer: Mailer, message: EmailMessage): Promise<void> {
 
 const REQUEST_COLUMNS = `id, client_name AS "clientName", phone, email, event_type AS "eventType",
   to_char(event_date, 'YYYY-MM-DD') AS "eventDate", description, venue, location, guests, urgency,
-  music_style AS "musicStyle", status, created_at AS "createdAt"`;
+  music_style AS "musicStyle", status, event_id AS "eventId", created_at AS "createdAt"`;
 
 export interface BookingRequestFilters {
   status?: BookingStatus;
@@ -339,4 +343,64 @@ export async function getBookingRequest(
   );
   if (!rows[0]) throw new ServiceError("not_found", "Request not found");
   return rows[0];
+}
+
+// How long a converted gig is until someone edits it: the Event form's default.
+const CONVERTED_EVENT_MINUTES = 60;
+
+// Turns the request into a Confirmed Event, once, and links the two. The Event
+// is "<type> — <client>" on the request's date, at its venue and location, with
+// no pay and the default Attendance. The request's status stays as it is and
+// nobody is emailed. Needs "manage bookings" and the edit-events permission.
+export async function convertBookingRequest(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  requestId: string,
+): Promise<{ eventId: string }> {
+  const permissions = await getPermissions(pool, user, projectId);
+  if (!permissions.manageBookings || !permissions.editRepertoireSetlistsEvents) {
+    throw new ServiceError("forbidden", "You don't have permission to do that");
+  }
+  if (!isUuid(requestId)) throw new ServiceError("not_found", "Request not found");
+  return inTransaction(pool, async (client) => {
+    // Locked, so two clicks can't both convert it.
+    const { rows } = await client.query<BookingRequest>(
+      `SELECT ${REQUEST_COLUMNS} FROM booking_requests WHERE id = $1 AND project_id = $2 FOR UPDATE`,
+      [requestId, projectId],
+    );
+    const request = rows[0];
+    if (!request) throw new ServiceError("not_found", "Request not found");
+    if (request.eventId) throw new ServiceError("already_converted", "Request already converted");
+    const location = [request.venue, request.location].filter(Boolean).join(", ") || null;
+    const { rows: events } = await client.query<{ id: string }>(
+      `INSERT INTO events (project_id, name, date, location, duration_minutes, status)
+       VALUES ($1, $2, $3, $4, $5, 'confirmed') RETURNING id`,
+      [
+        projectId,
+        `${EVENT_TYPE_LABELS[request.eventType]} — ${request.clientName}`,
+        request.eventDate,
+        location,
+        CONVERTED_EVENT_MINUTES,
+      ],
+    );
+    await client.query(`UPDATE booking_requests SET event_id = $2 WHERE id = $1`, [requestId, events[0].id]);
+    return { eventId: events[0].id };
+  });
+}
+
+// The request an Event came from, for those who manage bookings; null for
+// everyone else and for an Event that wasn't converted.
+export async function getEventBookingRequestId(
+  pool: Pool,
+  user: User,
+  projectId: string,
+  eventId: string,
+): Promise<string | null> {
+  if (!(await getPermissions(pool, user, projectId)).manageBookings || !isUuid(eventId)) return null;
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT id FROM booking_requests WHERE event_id = $1 AND project_id = $2`,
+    [eventId, projectId],
+  );
+  return rows[0]?.id ?? null;
 }

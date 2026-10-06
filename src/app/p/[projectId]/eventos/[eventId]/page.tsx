@@ -23,6 +23,7 @@ import { getAttendance } from "@/services/attendance.ts";
 import { getExpenses } from "@/services/expenses.ts";
 import { getPayments } from "@/services/payments.ts";
 import { getEvent, type Event } from "@/services/events.ts";
+import { getEventBookingRequestId } from "@/services/booking-requests.ts";
 import { getPermissions } from "@/services/permissions.ts";
 import { getEventMemberRules, getEventPayout } from "@/services/splits.ts";
 import { formatTotal } from "../../setlists/total.ts";
@@ -30,6 +31,7 @@ import { teleprompterHref } from "@/lib/teleprompter-href.ts";
 import { AttendanceSection } from "./attendance.tsx";
 import { EventControls } from "./event-controls.tsx";
 import { ExpensesSection } from "./expenses.tsx";
+import { NotifyAttendance } from "./notify-attendance.tsx";
 import { PaymentsSection } from "./payments.tsx";
 import { RepartoSection } from "./reparto.tsx";
 
@@ -55,6 +57,7 @@ export default async function EventPage({
   const expenses = await getExpenses(pool, user, projectId, eventId);
   const payments = await getPayments(pool, user, projectId, eventId);
   const payout = await getEventPayout(pool, user, projectId, eventId);
+  const bookingRequestId = await getEventBookingRequestId(pool, user, projectId, eventId);
   const split = permissions.administer
     ? await getEventMemberRules(pool, user, projectId, eventId)
     : undefined;
@@ -86,9 +89,15 @@ export default async function EventPage({
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {bookingRequestId && (
+            <Link href={`/p/${projectId}/solicitudes/${bookingRequestId}`} className="text-[13px]/[18px] underline">
+              Ver la solicitud
+            </Link>
+          )}
         </div>
         {canEdit && (
-          <div className="ml-auto">
+          <div className="ml-auto flex flex-col items-end gap-2">
+            <NotifyAttendance projectId={projectId} eventId={event.id} />
             <EventControls
               projectId={projectId}
               event={event}

@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/format.ts";
 import { getBookingRequest, listBookingNotes } from "@/services/booking-requests.ts";
 import { ServiceError } from "@/services/errors.ts";
 import { getPermissions } from "@/services/permissions.ts";
-import { DeleteRequest, NoteForm, StatusPicker } from "../request-controls.tsx";
+import { ConvertRequest, DeleteRequest, NoteForm, StatusPicker } from "../request-controls.tsx";
 
 export const metadata: Metadata = { title: "Solicitud · Backstage" };
 
@@ -25,6 +25,7 @@ export default async function BookingRequestDetail({
     throw err;
   });
 
+  const canConvert = (await getPermissions(pool, user, projectId)).editRepertoireSetlistsEvents;
   const notes = await listBookingNotes(pool, user, projectId, requestId);
 
   const rows: [string, string | null][] = [
@@ -67,6 +68,20 @@ export default async function BookingRequestDetail({
       <section className="flex max-w-[640px] flex-col gap-3">
         <h2 className="m-0 text-[18px]/[24px] font-semibold">Estado</h2>
         <StatusPicker projectId={projectId} requestId={requestId} status={request.status} />
+      </section>
+      <section className="flex max-w-[640px] flex-col gap-3">
+        <h2 className="m-0 text-[18px]/[24px] font-semibold">Evento</h2>
+        {request.eventId ? (
+          <Link href={`/p/${projectId}/eventos/${request.eventId}`} className="text-[14px]/[20px] underline">
+            Ver el evento
+          </Link>
+        ) : canConvert ? (
+          <ConvertRequest projectId={projectId} requestId={requestId} />
+        ) : (
+          <p className="m-0 text-[13px]/[18px] text-ink-muted">
+            Convertirla en evento necesita además el permiso para editar eventos.
+          </p>
+        )}
       </section>
       <section aria-labelledby="notas-title" className="flex max-w-[640px] flex-col gap-3">
         <h2 id="notas-title" className="m-0 text-[18px]/[24px] font-semibold">
