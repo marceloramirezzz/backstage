@@ -6,11 +6,15 @@ import { createEvent, updateEvent } from "./events.ts";
 import { acceptInvitation, sendInvitations } from "./invitations.ts";
 import {
   getLandingContent,
+  getLandingProfile,
   getLandingSettings,
   getPublicLanding,
   saveLandingAlbum,
+  saveLandingAudio,
   saveLandingContacts,
+  saveLandingProfile,
   saveLandingSettings,
+  saveLandingVideos,
 } from "./landing-page.ts";
 import { createProject } from "./projects.ts";
 import { listRoles } from "./roles.ts";
@@ -129,7 +133,7 @@ describe("Landing page", () => {
 
     it("starts empty", async () => {
       const b = await band("album-empty");
-      assert.deepEqual(await getLandingContent(db.pool, b.owner, b.project.id), { photos: [], contacts: [] });
+      assert.deepEqual(await getLandingContent(db.pool, b.owner, b.project.id), { photos: [], contacts: [], audio: [], videos: [] });
     });
 
     it("keeps the order and captions it was saved with, trimming captions and blanking empty ones", async () => {
@@ -256,6 +260,160 @@ describe("Landing page", () => {
     });
   });
 
+  describe("profile", () => {
+    const EMPTY = { tagline: null, genre: null, services: [], yearsActive: null, travelArea: null, about: null };
+    const FULL = {
+      tagline: "La fiesta que no para",
+      genre: "Cumbia y rock",
+      services: ["wedding", "festival"] as const,
+      yearsActive: 12,
+      travelArea: "Todo el Paraguay",
+      about: "Nacimos en Asunción.\nTocamos de todo.",
+    };
+
+    it("starts empty", async () => {
+      const b = await band("profile-empty");
+      assert.deepEqual(await getLandingProfile(db.pool, b.owner, b.project.id), EMPTY);
+    });
+
+    it("keeps each field, trimmed, and can set it before an address is chosen", async () => {
+      const b = await band("profile-set");
+      const saved = await saveLandingProfile(db.pool, b.owner, b.project.id, {
+        ...FULL,
+        services: [...FULL.services],
+        tagline: "  La fiesta que no para ",
+      });
+      assert.deepEqual(saved, { ...FULL, services: ["wedding", "festival"] });
+      assert.deepEqual(await getLandingProfile(db.pool, b.owner, b.project.id), saved);
+    });
+
+    it("clears each field with blanks, and dedupes services", async () => {
+      const b = await band("profile-clear");
+      await saveLandingProfile(db.pool, b.owner, b.project.id, { ...FULL, services: [...FULL.services] });
+      const saved = await saveLandingProfile(db.pool, b.owner, b.project.id, {
+        tagline: " ",
+        genre: "",
+        services: ["bar_restaurant", "bar_restaurant"],
+        yearsActive: null,
+        travelArea: "  ",
+        about: "",
+      });
+      assert.deepEqual(saved, { ...EMPTY, services: ["bar_restaurant"] });
+      assert.deepEqual(await saveLandingProfile(db.pool, b.owner, b.project.id, EMPTY), EMPTY);
+    });
+
+    it("accepts only services from the list", async () => {
+      const b = await band("profile-services");
+      await assert.rejects(
+        saveLandingProfile(db.pool, b.owner, b.project.id, { ...EMPTY, services: ["wedding", "hacking"] }),
+        { code: "invalid_input" },
+      );
+      assert.deepEqual(await getLandingProfile(db.pool, b.owner, b.project.id), EMPTY);
+    });
+
+    it("rejects too-long text and bad years, keeping the old profile", async () => {
+      const b = await band("profile-invalid");
+      await saveLandingProfile(db.pool, b.owner, b.project.id, { ...EMPTY, tagline: "Keep" });
+      for (const patch of [
+        { tagline: "x".repeat(121) },
+        { genre: "x".repeat(61) },
+        { travelArea: "x".repeat(121) },
+        { about: "x".repeat(2001) },
+        { yearsActive: -1 },
+        { yearsActive: 101 },
+        { yearsActive: 1.5 },
+      ]) {
+        await assert.rejects(saveLandingProfile(db.pool, b.owner, b.project.id, { ...EMPTY, ...patch }), {
+          code: "invalid_input",
+        });
+      }
+      assert.equal((await getLandingProfile(db.pool, b.owner, b.project.id)).tagline, "Keep");
+    });
+
+    it("is for Admins only, to read or write", async () => {
+      const b = await adminAndMember("profile-perms");
+      await assert.rejects(saveLandingProfile(db.pool, b.member, b.project.id, EMPTY), { code: "forbidden" });
+      await assert.rejects(getLandingProfile(db.pool, b.member, b.project.id), { code: "forbidden" });
+    });
+  });
+
+  describe("audio", () => {
+    const track = (n: number, title: string | null = null) => ({ url: `https://audio.example/${n}.mp3`, title });
+
+    it("keeps order and titles, trimming and blanking, and replaces on each save", async () => {
+      const b = await band("audio-order");
+      const saved = await saveLandingAudio(db.pool, b.owner, b.project.id, [track(2, " Demo "), track(1, "  ")]);
+      assert.deepEqual(saved, [track(2, "Demo"), track(1)]);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).audio, saved);
+      await saveLandingAudio(db.pool, b.owner, b.project.id, []);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).audio, []);
+    });
+
+    it("rejects non-https addresses, long titles and too many, keeping the old list", async () => {
+      const b = await band("audio-invalid");
+      await saveLandingAudio(db.pool, b.owner, b.project.id, [track(1)]);
+      for (const url of ["", "http://a.example/1.mp3", "javascript:alert(1)", "a.example/1.mp3", "https://a b"]) {
+        await assert.rejects(saveLandingAudio(db.pool, b.owner, b.project.id, [{ url, title: null }]), {
+          code: "invalid_input",
+        });
+      }
+      await assert.rejects(saveLandingAudio(db.pool, b.owner, b.project.id, [track(1, "x".repeat(141))]), {
+        code: "invalid_input",
+      });
+      await assert.rejects(
+        saveLandingAudio(db.pool, b.owner, b.project.id, Array.from({ length: 11 }, (_, i) => track(i))),
+        { code: "invalid_input" },
+      );
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).audio, [track(1)]);
+    });
+
+    it("is for Admins only", async () => {
+      const b = await adminAndMember("audio-perms");
+      await assert.rejects(saveLandingAudio(db.pool, b.member, b.project.id, [track(1)]), { code: "forbidden" });
+    });
+  });
+
+  describe("videos", () => {
+    const yt = (title: string | null = null) => ({ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title });
+    const vimeo = { url: "https://vimeo.com/76979871", title: null };
+
+    it("keeps YouTube and Vimeo links in order, and replaces on each save", async () => {
+      const b = await band("video-order");
+      const saved = await saveLandingVideos(db.pool, b.owner, b.project.id, [vimeo, yt(" En vivo ")]);
+      assert.deepEqual(saved, [vimeo, yt("En vivo")]);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).videos, saved);
+      await saveLandingVideos(db.pool, b.owner, b.project.id, []);
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).videos, []);
+    });
+
+    it("rejects any other host, keeping the old list", async () => {
+      const b = await band("video-invalid");
+      await saveLandingVideos(db.pool, b.owner, b.project.id, [vimeo]);
+      for (const url of [
+        "https://example.com/video.mp4",
+        "https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ",
+        "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://www.youtube.com/",
+        "https://tiktok.com/@a/video/1",
+        "",
+      ]) {
+        await assert.rejects(saveLandingVideos(db.pool, b.owner, b.project.id, [{ url, title: null }]), {
+          code: "invalid_input",
+        });
+      }
+      await assert.rejects(
+        saveLandingVideos(db.pool, b.owner, b.project.id, Array.from({ length: 7 }, () => vimeo)),
+        { code: "invalid_input" },
+      );
+      assert.deepEqual((await getLandingContent(db.pool, b.owner, b.project.id)).videos, [vimeo]);
+    });
+
+    it("is for Admins only", async () => {
+      const b = await adminAndMember("video-perms");
+      await assert.rejects(saveLandingVideos(db.pool, b.member, b.project.id, [vimeo]), { code: "forbidden" });
+    });
+  });
+
   describe("public page", () => {
     const TODAY = "2026-10-02";
 
@@ -360,6 +518,44 @@ describe("Landing page", () => {
       await saveLandingContacts(db.pool, a.owner, a.project.id, [{ platform: "email", label: null, value: "a@example.com" }]);
       const page = await getPublicLanding(db.pool, "album-mix-b", TODAY);
       assert.deepEqual([page?.photos, page?.contacts], [[], []]);
+    });
+
+    it("shows the profile, audio and videos live, each only when it has content", async () => {
+      const b = await publicBand("rich");
+      const bare = await getPublicLanding(db.pool, "rich", TODAY);
+      assert.deepEqual(bare?.profile, {
+        tagline: null, genre: null, services: [], yearsActive: null, travelArea: null, about: null,
+      });
+      assert.deepEqual([bare?.audio, bare?.videos], [[], []]);
+      await saveLandingProfile(db.pool, b.owner, b.project.id, {
+        tagline: "Hola", genre: null, services: ["wedding", "festival"], yearsActive: 0, travelArea: null, about: null,
+      });
+      await saveLandingAudio(db.pool, b.owner, b.project.id, [{ url: "https://audio.example/1.mp3", title: "Demo" }]);
+      await saveLandingVideos(db.pool, b.owner, b.project.id, [
+        { url: "https://youtu.be/dQw4w9WgXcQ", title: null },
+        { url: "https://vimeo.com/76979871", title: "Vivo" },
+      ]);
+      const page = await getPublicLanding(db.pool, "rich", TODAY);
+      assert.deepEqual(page?.profile, {
+        tagline: "Hola", genre: null, services: ["wedding", "festival"], yearsActive: 0, travelArea: null, about: null,
+      });
+      assert.deepEqual(page?.audio, [{ url: "https://audio.example/1.mp3", title: "Demo" }]);
+      assert.deepEqual(page?.videos, [
+        { embedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ", title: null },
+        { embedUrl: "https://player.vimeo.com/video/76979871", title: "Vivo" },
+      ]);
+    });
+
+    it("never shows another Banda's profile, audio or videos", async () => {
+      const a = await publicBand("rich-mix-a");
+      await publicBand("rich-mix-b");
+      await saveLandingProfile(db.pool, a.owner, a.project.id, {
+        tagline: "A", genre: null, services: ["wedding"], yearsActive: 3, travelArea: null, about: null,
+      });
+      await saveLandingAudio(db.pool, a.owner, a.project.id, [{ url: "https://audio.example/a.mp3", title: null }]);
+      await saveLandingVideos(db.pool, a.owner, a.project.id, [{ url: "https://vimeo.com/1", title: null }]);
+      const page = await getPublicLanding(db.pool, "rich-mix-b", TODAY);
+      assert.deepEqual([page?.profile.tagline, page?.profile.services, page?.audio, page?.videos], [null, [], [], []]);
     });
 
     it("never mixes in another Banda's content", async () => {
